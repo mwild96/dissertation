@@ -48,15 +48,15 @@ embedding_dim = 300
 class SIFDataset(Dataset):
     
     def __init__(self, file_path):
-        self.data = pd.read_csv(file_path)
+        self.data = pd.read_csv(file_path, header = 0)
         
     def __len__(self):
         return len(self.data)
     
     def __getitem__(self, index):
-        embedding = self.data[index, 0:embedding_dim]
+        embedding = np.asarray(self.data.iloc[index, 0:embedding_dim])
         #SHOULD THIS BE HERE OR SHOULD THIS BE DONE ALL AT ONCE IN THE BEGINNING?
-        label = self.data[index, embedding_dim]
+        label = np.asarray(self.data.iloc[index, embedding_dim])
  
         return embedding, label
 
@@ -199,7 +199,7 @@ for e in range(epochs):  # loop over the dataset multiple times
                 }, path_root + '\quora_word2vec_epoch' + str(e) + '_batch' + str(i) + '.pth')
             
             print('[%d, %5d] loss: %.3f' %
-                  (epochs + 1, i + 1, running_loss / 8)) #1000
+                  (e + 1, i + 1, running_loss / 8)) #1000
             #are we trying to print an estimate of the loss per batch then?
             #are we doing this right?
             running_loss = 0.0
@@ -292,10 +292,3 @@ net.train()
 # =============================================================================
 
 
-train_iter = iter(train_loader)
-
-
-for i, data in enumerate(train_loader, 0):
-    print(i)
-        # get the inputs; data is a list of [inputs, labels]
-    inputs, labels = data
