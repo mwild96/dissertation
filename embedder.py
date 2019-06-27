@@ -154,8 +154,8 @@ def weighted_average_embedding_array(embed_type, df, text_column1, text_column2,
     
     
     #get weighted embeddings
-    text1 = text1.progress_apply(lambda x: weighted_embedding_lookup(embed_type, x, weight_dict1, 300, vocabulary, model))
-    text2 = text2.apply(lambda x: weighted_embedding_lookup(embed_type, x, weight_dict2, 300, vocabulary, model))
+    text1 = text1.progress_apply(lambda x: weighted_embedding_lookup(embed_type, x, weight_dict1, vocabulary, model))
+    text2 = text2.apply(lambda x: weighted_embedding_lookup(embed_type, x, weight_dict2, vocabulary, model))
     
     
     #weighted average
