@@ -10,7 +10,6 @@ import numpy as np
 import nltk.tokenize 
 import collections
 import tqdm
-import allennlp.commands.elmo as elmo
 #nltk.download('punkt')
 
 
