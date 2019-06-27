@@ -7,10 +7,10 @@ Created on Thu Jun 13 14:14:47 2019
 """
 
 import numpy as np
-#import pandas as pd
 import nltk.tokenize 
 import collections
 import tqdm
+import allennlp.commands.elmo as elmo
 #nltk.download('punkt')
 
 
@@ -56,20 +56,25 @@ def SIF_weights(df, text_column, a=1):
 
 
 
-def weighted_embedding_lookup(vocabulary, lst, weight_dict, embedding_dim):
+def weighted_embedding_lookup(embed_type, lst, weight_dict, vocabulary=None,  model=None):
     '''
-    (currently designed to work with KeyedVector objects from the Gensim package for the vocabulary)
+    this function is designed to operate on a single list of words to be embedded (so over a dataframe, it should be applied rowwise)
     
-    words that do not appear in the vocabulary are effectively filtered out at validation/test time
+    for vocabulary based models: words that do not appear in the vocabulary are effectively filtered out at validation/test time
     '''
     
     pw_list = []
     embeddings_list = []
-    for i in range(len(lst)):
-        if lst[i] == 0:
-            pw_list.append(0)
-            embeddings_list.append(np.zeros((embedding_dim,)))
-        else:
+    
+    if vocabulary is not None:
+        for i in range(len(lst)):
+            #we are eliminating this because we are deciding that we're not going to do padding
+# =============================================================================
+#             if lst[i] == 0:
+#                 pw_list.append(0)
+#                 embeddings_list.append(np.zeros((embedding_dim,)))
+#             else:
+# =============================================================================
             if lst[i] in weight_dict.keys(): 
                 pw_list.append(weight_dict[lst[i]])
                 embeddings_list.append(vocabulary[lst[i]])
@@ -81,16 +86,33 @@ def weighted_embedding_lookup(vocabulary, lst, weight_dict, embedding_dim):
                 pw_list.append(1)
                 embeddings_list.append(vocabulary[lst[i]])
                 #note this we are effectively filtering out oov words (for validation purposes)
-                
-                
-    return np.multiply(np.stack(embeddings_list).T, np.stack(pw_list))
-
+                    
+                    
+        return np.multiply(np.stack(embeddings_list).T, np.stack(pw_list))
+        
+    if model is not None:
+        if embed_type == "elmo":
+            ''' wait how will I deal with the fact that an entire setence gets input here, in terms of the padding we did?
+            it looks like zero always gets the vector on each layer regardless of where the zero turns up (which makes sense
+            because there is no polysemy with )
+            '''
+            
+            for i in range(len(lst)):
+                if lst[i] in weight_dict.keys():
+                    pw_list.append(weight_dict[lst[i]])
+                else: 
+                    pw_list.append(1)
+                    
+            embeddings = model.embed_sentence(lst)
+            embeddings = np.mean(embeddings, axis=0)
+            
+            return np.multiply(embeddings.T, np.stack(pw_list))
 
     
 
 
 
-def weighted_average_embedding_array(embed_type, vocabulary, df, text_column1, text_column2, weight_dict1, weight_dict2, max_tokens, embedding_dim, a=1):
+def weighted_average_embedding_array(embed_type, df, text_column1, text_column2, weight_dict1, weight_dict2, vocabulary = None, model = None, a=1):
     '''
     This function takes turns the text columns of a record linkage dataframe into an array of word embedding
     vectors from the pre-trained word2vec model through gensim, weighted according to the weighting scheme
@@ -110,28 +132,31 @@ def weighted_average_embedding_array(embed_type, vocabulary, df, text_column1, t
     embedding_dim: the number of word embedding dimensions to retain
     
     Output:
-    an array (N,2*embedding_dim)
+    an array (N,embedding_dim)
     
     '''
     
 
     tqdm.tqdm.pandas()
     #tokenize
-    if embed_type == 'word2vec':
+    if embed_type != 'bert':
         text1 = df[text_column1].apply(str).apply(nltk.tokenize.word_tokenize)
         text2 = df[text_column2].apply(str).apply(nltk.tokenize.word_tokenize)
     
     
-    #padding
-    text1 = text1.apply(lambda x: x + ['0'] * 
-                        (max_tokens - len(x)) if len(x) < max_tokens else x[0:max_tokens])
-    text2 = text2.apply(lambda x: x + ['0'] * 
-                        (max_tokens - len(x)) if len(x) < max_tokens else x[0:max_tokens])
+    #NO PADDING IS NECESSARY WHEN WE'RE JUST TAKING THE AVERAGE 
+# =============================================================================
+#     text1 = text1.apply(lambda x: x + ['0'] * 
+#                         (max_tokens - len(x)) if len(x) < max_tokens else x[0:max_tokens])
+#     text2 = text2.apply(lambda x: x + ['0'] * 
+#                         (max_tokens - len(x)) if len(x) < max_tokens else x[0:max_tokens])
+#     
+# =============================================================================
     
     
     #get weighted embeddings
-    text1 = text1.progress_apply(lambda x: weighted_embedding_lookup(vocabulary, x, weight_dict1, 300))
-    text2 = text2.apply(lambda x: weighted_embedding_lookup(vocabulary, x, weight_dict2, 300))
+    text1 = text1.progress_apply(lambda x: weighted_embedding_lookup(embed_type, x, weight_dict1, 300, vocabulary, model))
+    text2 = text2.apply(lambda x: weighted_embedding_lookup(embed_type, x, weight_dict2, 300, vocabulary, model))
     
     
     #weighted average
@@ -155,105 +180,93 @@ def weighted_average_embedding_array(embed_type, vocabulary, df, text_column1, t
 
 
 
-# =============================================================================
-# word2vec_vocab = list(word2vec.vocab)
-# word2vec_vocab.sort()
-# for i in range(len(word2vec_vocab)):
-#     if '_' not in word2vec_vocab[i]:
-#         print(word2vec_vocab[i])
-# 
-# #looks like they did almost no pre-processing
-# #replace groups of numbers with groups of hashtags
-# #no lower casing even...
-#         
-#         
-#         
-# #check with the capitalization is like
-# import re
-# flat_list = [item for sublist in word2vec_vocab for item in sublist]
-# len(re.findall('([A-Z][a-z]+)', ' '.join(word2vec_vocab)))/len(word2vec_vocab)
-# re.findall('([a-z]+)', flat_list)
-# len(re.findall('(_)', ' '.join(word2vec_vocab)))/len(word2vec_vocab) 
-# re.match(r'\_', ' '.join(word2vec_vocab))        
-# =============================================================================
-
-
-#I guess I'm not worrying about the numbers that become # at the moment
-
-
-# =============================================================================
-# def filter_oov_word2vec(row):
-#     return list(filter(lambda x: x in list(word2vec.vocab), row))
-# 
-    
-# =============================================================================
-# def word2vec_lookup(lst, embedding_dim):
-#     word2vec_list = []
-#     for i in range(len(lst)):
-#         if lst[i] == 0:
-#             word2vec_list.append(np.zeros((embedding_dim,)))
-#         else:
-#             word2vec_list.append(word2vec[lst[i]])
-#     return np.stack(word2vec_list).T
-# =============================================================================
 
 
 
-# 
-# 
-# 
-# def word2vec_array(df, text_column1, text_column2, max_tokens, embedding_dim):
-# 
-#     '''
-#     This function turns the text columns of a record linkage dataframe into an array of word embedding
-#     vectors from the pre-trained word2vec model through gensim
-#     
-#     Input: 
-#     df: a dataframe (N,D) whose observations are pairs of observations from two separate original datasets that are 
-#     either a non-match or a match
-#     text_column1(2): the name, in string format, of the first (second) text column in df, to be converted to word
-#     embedding vectors
-#     max_tokens: for padding
-#     embedding_dim: the number of word embedding dimensions to retain
-#     
-#     Output:
-#     an array (N,2*embedding_dim)
-#     
-#     '''
-#     
-#     
-#     #tokenize
-#     text1 = df[text_column1].apply(nltk.tokenize.word_tokenize)
-#     text2 = df[text_column2].apply(nltk.tokenize.word_tokenize)
-#     
-#     
-#     #filter out oov words        
-#     text1 = text1.apply(filter_oov_word2vec)
-#     text2 = text2.apply(filter_oov_word2vec)
-#     #^assign a random vector to oov
-#     
-#     #padding
-#     text1 = text1.apply(lambda x: x + ['0'] * 
-#                         (max_tokens - len(x)) if len(x) < max_tokens else x[0:max_tokens])
-#     text2 = text2.apply(lambda x: x + ['0'] * 
-#                         (max_tokens - len(x)) if len(x) < max_tokens else x[0:max_tokens])
-#     
-#     #get embeddings
-#     text1 = text1.apply(lambda x: word2vec_lookup(x, 300))
-#     text2 = text2.apply(lambda x: word2vec_lookup(x, 300))
-#     
-#     
-#     #format array
-#     array1 = np.stack(text1.apply(lambda x: 
-#         np.reshape(x,(max_tokens*embedding_dim))).values)
-#         
-#     array2 = np.stack(text2.apply(lambda x: 
-#         np.reshape(x,(max_tokens*embedding_dim))).values)
-#     
-#     return np.concatenate((array1, array2), axis = 1)
 
-# 
-# =============================================================================
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+import pandas as pd
+
+
+
+quora = pd.read_csv('Data/QuoraDuplicateQuestions/questions.csv', encoding = 'utf-8')
+
+quora = quora.sample(n=100)
+
+
+elmo_model = elmo.ElmoEmbedder()
+
+weight_dict1 = SIF_weights(quora, 'question1')
+weight_dict2 = SIF_weights(quora, 'question2')
+
+
+test_array = weighted_average_embedding_array('elmo', quora, 'question1', 'question2', weight_dict1, weight_dict2, 300, vocabulary = None, model = elmo_model)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
