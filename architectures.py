@@ -10,6 +10,8 @@ Created on Fri Jun 21 09:51:16 2019
 import arg_extractor
 import numpy as np
 import pandas as pd
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import torch
 from torch.utils.data import DataLoader, Dataset
@@ -24,28 +26,29 @@ import mynetworks
 
 class SIFDataset(Dataset):
     
-    def __init__(self, file_path, embedding_dim):
+    def __init__(self, file_path, D):
         self.data = pd.read_csv(file_path, header = 0)
+        self.D = D
         
     def __len__(self):
         return len(self.data)
     
     def __getitem__(self, index):
-        embedding = np.asarray(self.data.iloc[index, 0:embedding_dim])
+        embedding = np.asarray(self.data.iloc[index, 0:self.D])
         #SHOULD THIS BE HERE OR SHOULD THIS BE DONE ALL AT ONCE IN THE BEGINNING?
-        label = np.asarray(self.data.iloc[index, embedding_dim])
+        label = np.asarray(self.data.iloc[index, self.D])
  
         return embedding, label
     
 
     
     
-def data_loaders_builder(dataset_class, batch_size, train_path, val_path):
+def data_loaders_builder(dataset_class, batch_size, train_path, val_path, D):
         
-    train_set = eval(dataset_class + '(train_path)')
+    train_set = eval(dataset_class + '(train_path, D)')
     train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
 
-    val_set = eval(dataset_class + '(val_path)')
+    val_set = eval(dataset_class + '(val_path, D)')
     val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=True)
     
     return train_loader, val_loader 
@@ -53,14 +56,16 @@ def data_loaders_builder(dataset_class, batch_size, train_path, val_path):
 
 
 #training
-def train(epochs, train_loader, val_loader, D, optimizer, net, loss, output_filename, val = True):
+def train(epochs, batch_size, train_loader, val_loader, val_size, D, optimizer, net, criterion, dev, output_filename, train_dataset_name, val = True):
     
     train_loss_over_time = []
     val_loss_over_time = []
-    val_iter = iter(val_loader)
+   
 
     for e in range(epochs):  # loop over the dataset multiple times
     
+        val_iter = iter(val_loader)
+        val_counter = 0
         running_loss = 0.0  
 
         for i, data in enumerate(train_loader, 0):
@@ -68,8 +73,8 @@ def train(epochs, train_loader, val_loader, D, optimizer, net, loss, output_file
             inputs, labels = data
             inputs = inputs.view(-1,D).float()
             labels = labels.view(-1,1).float()
-            inputs = inputs.to('cuda')
-            labels = labels.to('cuda')
+            inputs = inputs.to(dev)
+            labels = labels.to(dev)
             
     
             # zero the parameter gradients
@@ -77,7 +82,7 @@ def train(epochs, train_loader, val_loader, D, optimizer, net, loss, output_file
     
             # forward + backward + optimize
             outputs = net(inputs)
-            loss = criterion(outputs, labels)
+            loss = criterion(outputs, labels).to(dev)
             loss.backward()
             optimizer.step()
     
@@ -96,17 +101,24 @@ def train(epochs, train_loader, val_loader, D, optimizer, net, loss, output_file
                     inputs, labels = val_iter.next()
                     inputs = inputs.view(-1,D).float()
                     labels = labels.view(-1,1).float()
-                    inputs = inputs.to('cuda')
-                    labels = labels.to('cuda')
+                    inputs = inputs.to(dev)
+                    labels = labels.to(dev)
         
                     outputs = net(inputs)
                     loss = criterion(outputs, labels)
-                    val_loss_over_time.append(loss.item())
+                    val_loss_over_time.append(loss.item()/batch_size)#average loss per item
+                    
+                    val_counter += 1
+                    
+                    #reset the iterator if we've reached the end of it
+                    if val_counter % np.floor(val_size/batch_size) == 0:
+                        val_iter = iter(val_loader)
+                        val_counter = 0
                     
                 net.train()
             
             # model checkpoint & print statistics
-            running_loss += loss.item()
+            running_loss += loss.item()/batch_size #average loss per item 
             if i % 1000 == 0:    # print every 1000 mini-batches
                 
                 torch.save({ #save model parameters
@@ -128,24 +140,24 @@ def train(epochs, train_loader, val_loader, D, optimizer, net, loss, output_file
 
     
     if val == True:
-        plt.plot(np.arange(len(train_loss_over_time)), train_loss_over_time, np.arange(len(val_loss_over_time)), val_loss_over_time)
+        p = plt.plot(np.arange(len(train_loss_over_time)), train_loss_over_time, np.arange(len(val_loss_over_time)), val_loss_over_time)
         plt.xlabel('batch number')
         plt.ylabel('loss')
         plt.gca().legend(('train','validation'))
-        plt.show()
+        plt.savefig('TrainValLoss' + train_dataset_name + '.png')
     
     else:
-        plt.plot(np.arange(len(train_loss_over_time)), train_loss_over_time)
+        p = plt.plot(np.arange(len(train_loss_over_time)), train_loss_over_time)
         plt.xlabel('epoch*batch_size')
         plt.ylabel('loss')
         plt.gca().legend(('train','validation'))
-        plt.show()
+        plt.savefig('TrainValLoss' + train_dataset_name + '.png')
 
 
 
 
 #validation
-def evaluate(val_loader, D, net):    
+def evaluate(val_loader, D, net, dev):    
     
     
     #https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html#sphx-glr-beginner-blitz-cifar10-tutorial-py
@@ -166,8 +178,8 @@ def evaluate(val_loader, D, net):
             inputs, labels = data
             inputs = inputs.view(-1,D).float()
             labels = labels.view(-1,1).float()
-            inputs = inputs.to('cuda')
-            labels = labels.to('cuda')
+            inputs = inputs.to(dev)
+            labels = labels.to(dev)
             
             outputs = net(inputs)
             predicted = torch.round(outputs)

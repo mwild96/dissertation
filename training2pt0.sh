@@ -22,6 +22,8 @@ export PATH=${CUDA_HOME}/bin:${PATH}
 
 export PYTHON_PATH=$PATH
 
+export XDG_RUNTIME_DIR=/home/${STUDENT_ID}/Dissertation
+
 mkdir -p /disk/scratch/${STUDENT_ID}
 
 
@@ -43,4 +45,4 @@ source /home/${STUDENT_ID}/miniconda3/bin/activate dissertation
 #but I may just not worry about this for now
 
 #python3 or just python?
-python experiment.py --epochs 15 --batch_size 16 --D 300 --data_path "/home/s1834310/Dissertation/Data/QuoraDuplicateQuestions/" --output_filename "/home/s1834310/Dissertation/Models/quora_fasttext_SIF" --use_gpu 'True' --gpu_id '0' --train_dataset_name "quora_train_fasttext_SIF" --val_dataset_name "quora_val_fasttext_SIF" --seed 100 --dataset_class 'SIFDataset' --network 'HighwayReluNet' #--max_tokens 25
+python experiment.py --epochs 15 --batch_size 16 --D 300 --val_size 80870 --data_path "/home/s1834310/Dissertation/Data/QuoraDuplicateQuestions/" --output_filename "/home/s1834310/Dissertation/Models/quora_fasttext_SIF" --use_gpu 'True' --gpu_id '0' --train_dataset_name "quora_train_fasttext_SIF" --val_dataset_name "quora_val_fasttext_SIF" --seed 100 --dataset_class 'SIFDataset' --network 'HighwayReluNet' #--max_tokens 25

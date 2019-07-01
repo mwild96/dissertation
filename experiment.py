@@ -1,6 +1,8 @@
+import numpy as np
 import arg_extractor
 import architectures
 import mynetworks
+import torch 
 import torch.nn as nn
 import torch.optim as optim
 
@@ -13,7 +15,8 @@ torch.manual_seed(seed=args.seed) #not sure why we need both and what each of th
 #parameters
 epochs = args.epochs
 batch_size = args.batch_size 
-output_filename = args.output_filename
+output_file = args.output_filename
+val_size = args.val_size
 D = args.D
 #embedding_dim = args.embedding_dim
 #max_tokens = args.max_tokens #we never needed this
@@ -24,17 +27,18 @@ network = args.network
 
 
 #set up the data
-train_loader, val_loader = architectures.data_loaders_builder(dataset_class, batch_size, train_path, val_path)
+train_loader, val_loader = architectures.data_loaders_builder(dataset_class, batch_size, train_path, val_path, D)
 
 
 #create an instance of the network
 net = eval('mynetworks.' + network + '(input_size = D)')
-net = net.to('cuda')
+net = net.to(device)
 
 
 #I THINK THESE TWO WILL ALWAYS BE THE SAME
 #loss 
 criterion = nn.BCELoss()
+criterion = criterion.to(device)
 
 #optimizer
 optimizer = optim.Adam(net.parameters())
@@ -47,7 +51,7 @@ print('TRAINING FOR: ', args.train_dataset_name, ', ',
       sep = '')
 
 
-architectures.train(epochs, train_loader, val_loader, D, optimizer, net, loss, output_filename, val = True)
+architectures.train(epochs, batch_size, train_loader, val_loader, val_size, D, optimizer, net, criterion, device, output_file, args.train_dataset_name, val = True)
 
 
 print('VALIDATION FOR: ', args.train_dataset_name, ', ', 
@@ -55,7 +59,7 @@ print('VALIDATION FOR: ', args.train_dataset_name, ', ',
       str(network), ', ',
       sep = '')
 
-architectures.evaluate(val_loader, D, net)
+architectures.evaluate(val_loader, D, net, device)
 
 
 #does this division of things make sense?

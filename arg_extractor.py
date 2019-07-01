@@ -30,7 +30,7 @@ def get_args():
     parser.add_argument('--data_path', type=str, help='the path to pull the trian and validation datasets from')
     parser.add_argument('--output_path', type=str, help='path for the model checkpoint file to go')
     
-    parser.add_argument('--use_gpu', nargs="?", type=str2bool, default=False,
+    parser.add_argument('--use_gpu', nargs="?", type=str2bool, default=True,
                         help='A flag indicating whether we will use GPU acceleration or not')
     parser.add_argument('--gpu_id', type=str, default="None", help="A string indicating the gpu to use")
     parser.add_argument('--weight_decay_coefficient', nargs="?", type=float, default=1e-05,
@@ -38,6 +38,7 @@ def get_args():
     parser.add_argument('--seed', nargs="?", type=int, default=100,
                          help='Seed to use for random number generator for experiment')
     parser.add_argument('--D', type=int, help='feature dimension')
+    parser.add_argument('--val_size', type=int, help='number of observations in the validation data set')
     parser.add_argument('--output_filename', type=str, help='the base name of the file for the model checkpoints to be outputted as')
     parser.add_argument('--network', type=str, help='the name of the type of network we want to use, must be one from the mynetworks.py file')
     parser.add_argument('--dataset_class', type=str, help='the name of the type of dataset we are using, must be one from the architectures.py file')
