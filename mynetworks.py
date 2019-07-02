@@ -72,11 +72,63 @@ class HighwayReluNet(nn.Module):
         return torch.sigmoid(self.plain3(o2))#F.relu()?
     
     
-class LSTMSiameseNet2D(nn.Module):
-    def __init__(self, ...):
-        super(RNNSiameseNet, self).__init__()
+class LSTMNet(nn.Module):
+    '''
+    Adapated from the paper "Learning Text Similarity with Siamese Recurrent Networks"
+    
+    "The propose network contains four layers of Bidirectional LSTM nodes. The activations at each timestep of the final 
+    BLSTM layer are averaged to produce a fixed dimensional output. This output is projected through a single densely 
+    connected feedforward layer"
+    
+    Hyperparameters were chosen according to this paper ***EXCEPT FOR THE DROPOUT PROBABILITY, 
+    which was currently chosen arbitrarily**
+    
+    hidden_size = 64
+    num_layers = 4
+    bidirectional = True
+    '''
+    
+    
+    def __init__(self, embedding_dim, hidden_size, number_layers, dropout, bidirectional,):
+        super(LSTMNet, self).__init__()
+        #self.input_size = input_size
+        #SIZE OF HIDDEN LAYERS???
+        self.embedding_dim = embedding_dim
+        self.hidden_size = hidden_size
+        self.number_layers = number_layers
+        self.dropout = dropout
+        self.bidirectional = bidirectional
+        #SOMWEHERE IN HERE WE NEED TO DEFINE THE EMBEDDINGS SO WE CAN GET THEM LATER
+        
+        self.lstm = nn.LSTM(input_size = self.input_size, hidde_size = self.hidden_size,
+                            num_layers = self.number_layers, dropout = self.dropout, bidirectional = self.bidirectional)
+        #HOW DO THEY KNOW THE OUTPUT DIMENSION I WANT?
         
         
+        #how do we make this bidirectional?
+        
+        #self.plain2 = nn.Linear(self.input_size,self.input_size)
+        #self.plain3 = nn.Linear(self.input_size,1)
+    
+    def forward(self,x):
+        #DO THE EMBEDDING STEP
+        x = self.lstm(x)
+        
+#https://stackoverflow.com/questions/49710537/pytorch-gensim-how-to-load-pre-trained-word-embeddings        
+import gensim
+model = gensim.models.KeyedVectors.load_word2vec_format('path/to/file')
+weights = torch.FloatTensor(model.vectors)
 
+
+weight = torch.FloatTensor([[1, 2.3, 3], [4, 5.1, 6.3]])
+embedding = nn.Embedding.from_pretrained(weight)
+# Get embeddings for index 1
+input = torch.LongTensor([1])
+embedding(input)
+            
+        
+class SiameseNet(nn.Module):
+    def __init__(self, ...):
+        super(SiameseNet, self).__init__()
         
         
