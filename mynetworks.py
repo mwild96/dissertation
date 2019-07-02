@@ -72,14 +72,9 @@ class HighwayReluNet(nn.Module):
         return torch.sigmoid(self.plain3(o2))#F.relu()?
     
     
-    
-    
-# =============================================================================
-# class RNNSiameseNet(nn.Module):
-#     
-#     def __init__(self, ...):
-#         super(RNNSiameseNet, self).__init__()
-# =============================================================================
+class LSTMSiameseNet2D(nn.Module):
+    def __init__(self, ...):
+        super(RNNSiameseNet, self).__init__()
         
         
 
