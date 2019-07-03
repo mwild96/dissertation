@@ -141,17 +141,20 @@ class LSTMSiameseNet(nn.Module):
     
     hidden_size = 64
     num_layers = 4
+    out_features = 128?????? <-I'm really unclear about this part from the paper
     bidirectional = True
+    dropout = ? (BUT THEY USE IT)
     '''
     
     
-    def __init__(self, embedding_dim, hidden_size, number_layers, dropout, bidirectional,embeddings):
+    def __init__(self, embedding_dim, hidden_size, number_layers, out_features, dropout, bidirectional, embeddings):
         super(LSTMNet, self).__init__()
         #self.input_size = input_size
         #SIZE OF HIDDEN LAYERS???
         self.embedding_dim = embedding_dim
         self.hidden_size = hidden_size
         self.number_layers = number_layers
+        self.out_features = out_features
         self.dropout = dropout
         self.bidirectional = bidirectional
         self.embedding = nn.Embedding.from_pretrained(embeddings)
@@ -160,18 +163,20 @@ class LSTMSiameseNet(nn.Module):
         self.lstm = nn.LSTM(input_size = self.input_size, hidde_size = self.hidden_size,
                             num_layers = self.number_layers, dropout = self.dropout, bidirectional = self.bidirectional)
         #HOW DO THEY KNOW THE OUTPUT DIMENSION I WANT?
-        self.fc = nn.Linear(in_features = self.hidden_size, out_features = 1)#I'M NOT CLEAR ON HOW THIS ENDS
+        self.fc = nn.Linear(in_features = self.hidden_size, out_features = self.out_features)#I'M NOT CLEAR ON HOW THIS ENDS
     
     def forward_once(self,x):
         #DO THE EMBEDDING STEP
         x = self.embedding(x)
         x = self.lstm(x)
-        x = AVERAGE(x)
-        x = self.fc(x) #WHAT IS THE ACTIVATION FUNCTION HERE?
+        x = torch.mean(x) #WE NEED TO MAKE SURE THIS IS OVER THE RIGHT DIMENSION
+        x = self.fc(x) #WHAT IS THE ACTIVATION FUNCTION HERE? none?
         return x
     
     def forward(self,x1, x2):
-        
+        x1 = forward_once(x1)
+        x2 = forward_once(x2)
+        return x1, x2
        
         
         
