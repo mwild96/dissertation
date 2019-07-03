@@ -40,7 +40,42 @@ class SIFDataset(Dataset):
  
         return embedding, label
     
+    
+    
+    
+    
+    
+class RawTextDataset(Dataset):
+    
+    def __init__(self, file_path):
+        #***FINISH THIS**
+        
+        
 
+    
+#https://innovationincubator.com/siamese-neural-network-with-pytorch-code-example/    
+class ContrastiveLoss(nn.Module):
+
+      def __init__(self, margin=2.0):
+            super(ContrastiveLoss, self).__init__()
+            self.margin = margin
+
+      def forward(self, output1, output2, label):
+            # Find the pairwise distance or eucledian distance of two output feature vectors
+            cosine_similarity = F.cosine_similarity(output1, output2)
+            # perform contrastive loss calculation with the distance
+            loss_contrastive = torch.mean(label * torch.pow(0.25*cosine_similarity, 2) +
+            (1 - label) * torch.pow(torch.clamp(self.margin - cosine_similarity, min=0.0), 2))
+
+            return loss_contrastive    
+    
+    
+    
+    
+    
+    
+    
+    
     
     
 def data_loaders_builder(dataset_class, batch_size, train_path, val_path, D):
