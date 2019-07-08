@@ -64,8 +64,6 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
 
     for e in range(epochs):  # loop over the dataset multiple times
     
-        val_iter = iter(val_loader)
-        val_counter = 0
         running_loss = 0.0
         running_loss_val = 0.0
 
