@@ -10,6 +10,8 @@ import numpy as np
 import nltk.tokenize 
 import collections
 import tqdm
+import re
+import torch
 #nltk.download('punkt')
 
 
@@ -55,7 +57,7 @@ def SIF_weights(df, text_column, a=1):
 
 
 
-def weighted_embedding_lookup(embed_type, lst, weight_dict, vocabulary=None,  model=None):
+def weighted_embedding_lookup(embed_type, lst, weight_dict, tokenizer = None, vocabulary=None,  model=None):
     '''
     this function is designed to operate on a single list of words to be embedded (so over a dataframe, it should be applied rowwise)
     
@@ -106,12 +108,38 @@ def weighted_embedding_lookup(embed_type, lst, weight_dict, vocabulary=None,  mo
             embeddings = np.mean(embeddings, axis=0)
             
             return np.multiply(embeddings.T, np.stack(pw_list))
+        
+        if embed_type == 'bert':
+            
+            for i in range(len(lst)):
+                if lst[i] in weight_dict.keys():
+                    pw_list.append(weight_dict[lst[i]])
+                else: 
+                    pw_list.append(1)            
+            
+            
+            indexed_tokens = tokenizer.convert_tokens_to_ids(lst)
+            
+            # Define sentence A and B indices associated to 1st and 2nd sentences (see paper)
+            segments_ids = [1]*len(indexed_tokens)
+            
+            # Convert inputs to PyTorch tensors
+            segments_tensors = torch.tensor([segments_ids])
+            tokens_tensor = torch.tensor([indexed_tokens])
+            
+            with torch.no_grad():
+                encoded_layers, _ = model(tokens_tensor, segments_tensors)
+            
+            #we'll take the top four layers because that's what they suggest to do in the paper
+            embeddings = np.stack(encoded_layers).squeeze()[8:,:,:] 
+            embeddings = np.mean(embeddings, axis=0)
+            
+            
+            return np.multiply(embeddings.T, np.stack(pw_list))
+            
 
-    
 
-
-
-def weighted_average_embedding_array(embed_type, df, text_column1, text_column2, weight_dict1, weight_dict2, vocabulary = None, model = None, a=1):
+def weighted_average_embedding_array(embed_type, df, text_column1, text_column2, weight_dict1, weight_dict2, tokenizer = None, vocabulary = None, model = None, a=1):
     '''
     This function takes turns the text columns of a record linkage dataframe into an array of word embedding
     vectors from the pre-trained word2vec model through gensim, weighted according to the weighting scheme
@@ -139,8 +167,16 @@ def weighted_average_embedding_array(embed_type, df, text_column1, text_column2,
     tqdm.tqdm.pandas()
     #tokenize
     if embed_type != 'bert':
-        text1 = df[text_column1].apply(str).apply(nltk.tokenize.word_tokenize)
-        text2 = df[text_column2].apply(str).apply(nltk.tokenize.word_tokenize)
+        text1 = df[text_column1].apply(str).apply(lambda x: re.sub('n\'t', ' not', x))
+        text2 = df[text_column2].apply(str).apply(lambda x: re.sub('n\'t', ' not', x))
+        
+        text1 = text1.apply(str).apply(nltk.tokenize.word_tokenize)
+        text2 = text2.apply(str).apply(nltk.tokenize.word_tokenize)
+        
+    elif embed_type == 'bert':
+        
+        text1 = df[text_column1].progress_apply(lambda x: "[CLS] " + str(x) + " [SEP]").apply(tokenizer.tokenize)
+        text2 = df[text_column2].progress_apply(lambda x: "[CLS] " + str(x) + " [SEP]").apply(tokenizer.tokenize)
     
     
     #NO PADDING IS NECESSARY WHEN WE'RE JUST TAKING THE AVERAGE 
@@ -154,12 +190,12 @@ def weighted_average_embedding_array(embed_type, df, text_column1, text_column2,
     
     
     #get weighted embeddings
-    text1 = text1.progress_apply(lambda x: weighted_embedding_lookup(embed_type, x, weight_dict1, vocabulary, model))
-    text2 = text2.apply(lambda x: weighted_embedding_lookup(embed_type, x, weight_dict2, vocabulary, model))
+    text1 = text1.progress_apply(lambda x: weighted_embedding_lookup(embed_type, x, weight_dict1, tokenizer, vocabulary, model))
+    text2 = text2.progress_apply(lambda x: weighted_embedding_lookup(embed_type, x, weight_dict2, tokenizer, vocabulary, model))
     
     
     #weighted average
-    text1 = text1.progress_apply(np.mean, axis=1) 
+    text1 = text1.apply(np.mean, axis=1) 
     text2 = text2.apply(np.mean, axis=1)
     
     #format arrays
@@ -168,4 +204,90 @@ def weighted_average_embedding_array(embed_type, df, text_column1, text_column2,
         
     
     return np.abs(array1-array2)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
