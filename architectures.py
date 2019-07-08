@@ -40,42 +40,7 @@ class SIFDataset(Dataset):
  
         return embedding, label
     
-    
-    
-    
-    
-    
-class RawTextDataset(Dataset):
-    
-    def __init__(self, file_path):
-        #***FINISH THIS**
-        
-        
 
-    
-#https://innovationincubator.com/siamese-neural-network-with-pytorch-code-example/    
-class ContrastiveLoss(nn.Module):
-
-      def __init__(self, margin=2.0):
-            super(ContrastiveLoss, self).__init__()
-            self.margin = margin
-
-      def forward(self, output1, output2, label):
-            # Find the pairwise distance or eucledian distance of two output feature vectors
-            cosine_similarity = F.cosine_similarity(output1, output2)
-            # perform contrastive loss calculation with the distance
-            loss_contrastive = torch.mean(label * torch.pow(0.25*cosine_similarity, 2) +
-            (1 - label) * torch.pow(torch.clamp(self.margin - cosine_similarity, min=0.0), 2))
-
-            return loss_contrastive    
-    
-    
-    
-    
-    
-    
-    
-    
     
     
 def data_loaders_builder(dataset_class, batch_size, train_path, val_path, D):
@@ -91,7 +56,7 @@ def data_loaders_builder(dataset_class, batch_size, train_path, val_path, D):
 
 
 #training
-def train(epochs, batch_size, train_loader, val_loader, val_size, D, optimizer, net, criterion, dev, output_filename, train_dataset_name, val = True):
+def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D, optimizer, net, criterion, dev, output_filename, train_dataset_name, val = True):
     
     train_loss_over_time = []
     val_loss_over_time = []
@@ -101,7 +66,8 @@ def train(epochs, batch_size, train_loader, val_loader, val_size, D, optimizer, 
     
         val_iter = iter(val_loader)
         val_counter = 0
-        running_loss = 0.0  
+        running_loss = 0.0
+        running_loss_val = 0.0
 
         for i, data in enumerate(train_loader, 0):
             # get the inputs; data is a list of [inputs, labels]
@@ -120,56 +86,43 @@ def train(epochs, batch_size, train_loader, val_loader, val_size, D, optimizer, 
             loss = criterion(outputs, labels).to(dev)
             loss.backward()
             optimizer.step()
-    
-    
-            train_loss_over_time.append(loss.item())
             
-            
-            #check how we're doing with our validation error    
-            #WE MIGHT NOT NEED TO CHECK THIS THIS OFTEN...
-            
-            
+            #append loss
+            running_loss += loss.item()/batch_size #average loss per item 
+           
+        if i*batch_size <= train_size:
+
+            train_loss_over_time.append(running_loss)
+
             if val == True: 
                 net.eval()
-                
+
                 with torch.no_grad():
-                    inputs, labels = val_iter.next()
-                    inputs = inputs.view(-1,D).float()
-                    labels = labels.view(-1,1).float()
-                    inputs = inputs.to(dev)
-                    labels = labels.to(dev)
-        
-                    outputs = net(inputs)
-                    loss = criterion(outputs, labels)
-                    val_loss_over_time.append(loss.item()/batch_size)#average loss per item
-                    
-                    val_counter += 1
-                    
-                    #reset the iterator if we've reached the end of it
-                    if val_counter % np.floor(val_size/batch_size) == 0:
-                        val_iter = iter(val_loader)
-                        val_counter = 0
-                    
+
+                    for data in val_loader:
+                        inputs, labels = data
+                        inputs = inputs.view(-1,D).float()#.cuda(async=True)
+                        labels = labels.view(-1,1).float()#.cuda(async=True)
+                        #inputs.cuda()
+                        #labels.cuda()
+                        inputs = inputs.to(dev)
+                        labels = labels.to(dev)
+
+                        outputs = net(inputs)
+                        loss = criterion(outputs, labels)
+                        running_loss_val += loss.item()
+
+
+                val_loss_over_time.append(running_loss_val)
+
                 net.train()
-            
-            # model checkpoint & print statistics
-            running_loss += loss.item()/batch_size #average loss per item 
-            if i % 1000 == 0:    # print every 1000 mini-batches
-                
-                torch.save({ #save model parameters
-                    'epoch': e,
-                    'model_state_dict': net.state_dict(),
-                    'optimizer_state_dict': optimizer.state_dict(),
-                    'loss': running_loss
-                    }, output_filename + '_epoch' + str(e) + '_batch' + str(i) + '.pth')
-                
-                print('[%d, %5d] loss: %.3f' %
-                      (e + 1, i + 1, running_loss / 1000))#the average loss over the previous 1000? 
-                #are we trying to print an estimate of the loss per batch then?
-                #are we doing this right?
-                running_loss = 0.0
-                
-                
+
+            torch.save({ #save model parameters
+                 'epoch': e,
+                 'model_state_dict': net.state_dict(),
+                 'optimizer_state_dict': optimizer.state_dict(),
+                 'loss': running_loss
+                 }, output_filename + str(e) + '.pth')
     
     print('Finished Training')
 
