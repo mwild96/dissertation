@@ -119,7 +119,12 @@ def weighted_embedding_lookup(embed_type, lst, weight_dict, tokenizer = None, vo
             
             
             indexed_tokens = tokenizer.convert_tokens_to_ids(lst)
-            
+        
+            #note: BERT is trained on "combined token length" of <= 512 tokens
+            if len(indexed_tokens) > 512:
+                indexed_tokens = indexed_tokens[0:513]
+                
+                
             # Define sentence A and B indices associated to 1st and 2nd sentences (see paper)
             segments_ids = [1]*len(indexed_tokens)
             
