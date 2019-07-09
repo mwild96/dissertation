@@ -1,7 +1,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu Jun 13 11:48:25 2019
-
 @author: Monica
 """
 
@@ -132,6 +131,4 @@ class LSTMSiameseNet(nn.Module):
         x1 = self.forward_once(x1)
         x2 = self.forward_once(x2)
         return F.cosine_similarity(x1, x2)#is this what I'm supposed to return?
-        #outcome is cosince similarity IS bounded between [0,1] which is obviously useful for us
-       
-    
+#outcome is cosince similarity IS bounded between [0,1] which is obviously useful for us

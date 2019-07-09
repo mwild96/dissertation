@@ -38,11 +38,25 @@ def get_args():
     parser.add_argument('--seed', nargs="?", type=int, default=100,
                          help='Seed to use for random number generator for experiment')
     parser.add_argument('--D', type=int, help='feature dimension')
+    parser.add_argument('--train_size', type=int, help='number of observations in the train data set')
     parser.add_argument('--val_size', type=int, help='number of observations in the validation data set')
     parser.add_argument('--output_filename', type=str, help='the base name of the file for the model checkpoints to be outputted as')
     parser.add_argument('--network', type=str, help='the name of the type of network we want to use, must be one from the mynetworks.py file')
     parser.add_argument('--dataset_class', type=str, help='the name of the type of dataset we are using, must be one from the architectures.py file')
     
+    
+    
+    parser.add_argument('--embedding_type', type=str, default = None, help='the name of the embedding model to be used, only relevant for non-SIF models')
+    parser.add_argument('--max_tokens', type=int, default = None, help='the maximum number of tokens to include for padding purposes, only relevant for non-SIF models')
+    parser.add_argument('--text_column1', type=str, default=None, help='the name of the column of text data from the first dataset in the pair of datasets to be linked, only relevant for non-SIF models')
+    parser.add_argument('--text_column2', type=str, default=None, help='the name of the column of text data from the second dataset in the pair of datasets to be linked, only relevant for non-SIF models')
+    parser.add_argument('--encoding', type=str, default=None, help='the type of encoding to be used when importing the raw text dataset')
+    parser.add_argument('--hidden_size', type=int, default=None, help='the size of the hidden layers to be used in the LSTM encoder, only relevant for non-SIF models')
+    parser.add_argument('--num_layers', type=int, default=None, help='the number of layers to be used in the LSTM encoder, only relevant for non-SIF models')
+    parser.add_argument('--out_features', type=int, default=None, help='tbh idk')
+    parser.add_argument('--dropout', type=float, default=None, help='dropout probability to be used in the LSTM encoder')
+    parser.add_argument('--bidirectional', type=bool, default=None, help='whether or not the LSTM encoder should be bidirectional, only relevant for non-SIF models')
+                     
     
     #do I need this shit?
 #     parser.add_argument('--filepath_to_arguments_json_file', nargs="?", type=str, default=None,help='')
