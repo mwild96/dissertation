@@ -2,7 +2,6 @@
 # -*- coding: utf-8 -*-
 """
 Created on Thu Jun 13 14:14:47 2019
-
 @author: s1834310
 """
 
@@ -149,7 +148,6 @@ def weighted_average_embedding_array(embed_type, df, text_column1, text_column2,
     This function takes turns the text columns of a record linkage dataframe into an array of word embedding
     vectors from the pre-trained word2vec model through gensim, weighted according to the weighting scheme
     of the SIF model in the Design Space Exploration paper
-
     
     Input: 
     df: a dataframe (N,D) whose observations are pairs of observations from two separate original datasets that are 
@@ -209,3 +207,9 @@ def weighted_average_embedding_array(embed_type, df, text_column1, text_column2,
         
     
     return np.abs(array1-array2)
+
+
+def word2index(lst, vocab):
+    for i in range(len(lst)):
+        lst[i] = vocab.vocab.get(lst[i]).index
+    return lst

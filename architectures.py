@@ -7,17 +7,20 @@ Created on Fri Jun 21 09:51:16 2019
 """
 
 
-import arg_extractor
 import numpy as np
 import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import nltk.tokenize
 import torch
+#import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 import torch.nn as nn
-import torch.optim as optim
+#import torch.optim as optim
+#import torch.nn.utils.rnn as rnn
 import mynetworks
+import embedder
 
 
 
@@ -40,19 +43,83 @@ class SIFDataset(Dataset):
  
         return embedding, label
     
+   
+    
+class RawTextDataset(Dataset):
+    
+    def __init__(self, file_path, text_column1, text_column2, vocab, max_tokens):
+        self.data = pd.read_csv(file_path, header = 0)
+        self.text_column1 = text_column1
+        self.text_column2 = text_column2
+        self.vocab = vocab
+        self.max_tokens = max_tokens
+        
+    def __len__(self):
+        return len(self.data)
+    
+    def __getitem__(self, index):
+        
+        text1 = nltk.tokenize.word_tokenize(pd.DataFrame(self.data.loc[self.data.index[index], self.text_column1]))
+        text2 = nltk.tokenize.word_tokenize(pd.DataFrame(self.data.loc[self.data.index[index], self.text_column1]))
+        
+        text1 = text1 + ['<PAD>'] * (self.max_tokens - len(text1)) if len(text1) < self.max_tokens else text1[0:self.max_tokens]
+        text2 = text2 + ['<PAD>'] * (self.max_tokens - len(text2)) if len(text2) < self.max_tokens else text2[0:self.max_tokens]
+        
+        
+        text1 = embedder.word2index(text1, self.vocab)
+        text2 = embedder.word2index(text2, self.vocab)
+        
+        label = self.data.iloc[index,self.data.shape[1]-1]
+        
+        return np.asarray(text1), np.asarray(text2), np.asarray(label)
+    
+    
+    
+    
+def data_loaders_builder(dataset_class, batch_size, train_path = None, val_path = None, D = None,
+                         text_column1 = None, text_column2 = None, vocab = None, max_tokens = None, vocab_size = None):
+    
+    if dataset_class == 'SIFDataset':
+        
+        train_set = eval(dataset_class + '(train_path, D)')
+        train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
+    
+        val_set = eval(dataset_class + '(val_path, D)')
+        val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=True)
+    
+    if dataset_class == 'RawTextDataset':
+        train_set = eval(dataset_class + '(train_path, text_column1, text_column2, vocab, max_tokens)')#, vocab_size
+        #idk if this is going to work with the padding thing we've done because
+        #I think this loads it little by little? I can't tell if this only does it when DataLoader tells it to or if it does it all at once
+        #and then DataLoader loads it little by little
+        train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
+        
+        val_set = eval(dataset_class + '(val_path, text_column1, text_column2, vocab, max_tokens)')#, vocab_size
+        val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=True)
+    
+    return train_loader, val_loader     
+    
+    
+
 
     
-    
-def data_loaders_builder(dataset_class, batch_size, train_path, val_path, D):
-        
-    train_set = eval(dataset_class + '(train_path, D)')
-    train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
+#https://innovationincubator.com/siamese-neural-network-with-pytorch-code-example/    
+class ContrastiveLoss(nn.Module):
 
-    val_set = eval(dataset_class + '(val_path, D)')
-    val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=True)
+      def __init__(self, margin=2.0): #definitely just stole that margin = 2 thing from the link above
+            super(ContrastiveLoss, self).__init__()
+            self.margin = margin
+
+      def forward(self, cosine_similarity, label):
+            # Find the pairwise distance or eucledian distance of two output feature vectors
+            #cosine_similarity = F.cosine_similarity(output1, output2)
+            # perform contrastive loss calculation with the distance
+            loss_contrastive = torch.mean(label * torch.pow(0.25*cosine_similarity, 2) +
+            (1 - label) * torch.pow(torch.clamp(self.margin - cosine_similarity, min=0.0), 2))
+
+            return loss_contrastive    
+
     
-    return train_loader, val_loader 
-        
 
 
 #training
@@ -138,7 +205,6 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
         plt.ylabel('loss')
         plt.gca().legend(('train','validation'))
         plt.savefig('TrainValLoss' + train_dataset_name + '.png')
-
 
 
 
