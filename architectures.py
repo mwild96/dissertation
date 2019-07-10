@@ -2,6 +2,7 @@
 # -*- coding: utf-8 -*-
 """
 Created on Fri Jun 21 09:51:16 2019
+
 @author: s1834310
 """
 
@@ -58,19 +59,35 @@ class RawTextDataset(Dataset):
     
     def __getitem__(self, index):
         
-        text1 = nltk.tokenize.word_tokenize(pd.DataFrame(self.data.loc[self.data.index[index], self.text_column1]))
-        text2 = nltk.tokenize.word_tokenize(pd.DataFrame(self.data.loc[self.data.index[index], self.text_column1]))
+        text1 = pd.Series(self.data.loc[self.data.index[index], 
+                                        self.text_column1]).apply(str).apply(nltk.tokenize.word_tokenize)
+        text2 = pd.Series(self.data.loc[self.data.index[index], 
+                                        self.text_column2]).apply(str).apply(nltk.tokenize.word_tokenize)
         
-        text1 = text1 + ['<PAD>'] * (self.max_tokens - len(text1)) if len(text1) < self.max_tokens else text1[0:self.max_tokens]
-        text2 = text2 + ['<PAD>'] * (self.max_tokens - len(text2)) if len(text2) < self.max_tokens else text2[0:self.max_tokens]
+        
+        text1 = text1.apply(lambda x: x + ['<PAD>'] * (self.max_tokens - len(x)) if 
+                            len(x) < self.max_tokens else x[0:self.max_tokens])
+        text2 = text2.apply(lambda x: x + ['<PAD>'] * (self.max_tokens - len(x)) if 
+                            len(x) < self.max_tokens else x[0:self.max_tokens])
+        
+        text1 = text1.apply(lambda x: embedder.word2index(x, self.vocab))
+        text2 = text2.apply(lambda x: embedder.word2index(x, self.vocab))
+    
+    
+        #text1 = nltk.tokenize.word_tokenize(self.data.loc[self.data.index[index], self.text_column1])
+        #text2 = nltk.tokenize.word_tokenize(self.data.loc[self.data.index[index], self.text_column1])
+        
+        #text1 = text1 + ['<PAD>'] * (self.max_tokens - len(text1)) if len(text1) < self.max_tokens else text1[0:self.max_tokens]
+        #text2 = text2 + ['<PAD>'] * (self.max_tokens - len(text2)) if len(text2) < self.max_tokens else text2[0:self.max_tokens]
         
         
-        text1 = embedder.word2index(text1, self.vocab)
-        text2 = embedder.word2index(text2, self.vocab)
+        #text1 = embedder.word2index(text1, self.vocab)
+        #text2 = embedder.word2index(text2, self.vocab)
+        
         
         label = self.data.iloc[index,self.data.shape[1]-1]
         
-        return np.asarray(text1), np.asarray(text2), np.asarray(label)
+        return torch.tensor(text1), torch.tensor(text2), torch.tensor(label)
     
     
     
@@ -134,40 +151,19 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
         running_loss_val = 0.0
 
         for i, data in enumerate(train_loader, 0):
-            if net.__class__.__name__ == 'HighwayReluNet':
-                # get the inputs; data is a list of [inputs, labels]
-                inputs, labels = data
-                inputs = inputs.squeeze().float()#.view(-1,D)
-                labels = labels.reshape(-1,1).float()
-                inputs = inputs.to(dev)
-                labels = labels.to(dev)
+            # get the inputs; data is a list of [inputs, labels]
+            inputs, labels = data
+            inputs = inputs.view(-1,D).float()
+            labels = labels.view(-1,1).float()
+            inputs = inputs.to(dev)
+            labels = labels.to(dev)
             
     
-                # zero the parameter gradients
-                optimizer.zero_grad()
-
-                # forward + backward + optimize
-                outputs = net(inputs)
-                
-            elif net.__class__.__name__ == 'LSTMSiameseNet':
-                
-                inputs1, inputs2, labels = data
-                inputs1 = inputs1.squeeze().long()
-                inputs2 = inputs2.squeeze().long()
-                labels = labels.reshape(-1,1).float()
-                inputs1 = inputs1.to(dev)
-                inputs2 = inputs2.to(dev)
-                labels = labels.to(dev)
-
-                # zero the parameter gradients
-                optimizer.zero_grad()
-
-                # forward + backward + optimize
-                outputs = net(inputs1, inputs2) 
-                
-                
-                
-                
+            # zero the parameter gradients
+            optimizer.zero_grad()
+    
+            # forward + backward + optimize
+            outputs = net(inputs)
             loss = criterion(outputs, labels).to(dev)
             loss.backward()
             optimizer.step()
@@ -185,34 +181,18 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
                 with torch.no_grad():
 
                     for data in val_loader:
-                        
-                        if net.__class__.__name__ == 'HighwayReluNet':
-                        
-                            inputs, labels = data
-                            inputs = inputs.view(-1,D).float()#.cuda(async=True)
-                            labels = labels.view(-1,1).float()#.cuda(async=True)
-                            #inputs.cuda()
-                            #labels.cuda()
-                            inputs = inputs.to(dev)
-                            labels = labels.to(dev)
+                        inputs, labels = data
+                        inputs = inputs.view(-1,D).float()#.cuda(async=True)
+                        labels = labels.view(-1,1).float()#.cuda(async=True)
+                        #inputs.cuda()
+                        #labels.cuda()
+                        inputs = inputs.to(dev)
+                        labels = labels.to(dev)
 
-                            outputs = net(inputs)
-                            
-                        elif net.__class__.__name__ == 'LSTMSiameseNet':
-                
-                            inputs1, inputs2, labels = data
-                            inputs1 = inputs1.squeeze().long()
-                            inputs2 = inputs2.squeeze().long()
-                            labels = labels.reshape(-1,1).float()
-                            inputs1 = inputs1.to(dev)
-                            inputs2 = inputs2.to(dev)
-                            labels = labels.to(dev)
-                            
-                            outputs = net(inputs1, inputs2)
-                        
-                        
+                        outputs = net(inputs)
                         loss = criterion(outputs, labels)
                         running_loss_val += loss.item()
+
 
                 val_loss_over_time.append(running_loss_val)
 
@@ -263,31 +243,13 @@ def evaluate(val_loader, D, net, dev):
     
     with torch.no_grad():
         for data in val_loader:
+            inputs, labels = data
+            inputs = inputs.view(-1,D).float()
+            labels = labels.view(-1,1).float()
+            inputs = inputs.to(dev)
+            labels = labels.to(dev)
             
-            if net.__class__.__name__ == 'HighwayReluNet':
-            
-                inputs, labels = data
-                inputs = inputs.squeeze().float()#view(-1,D)
-                labels = labels.reshape(-1,1).float()#view(-1,1)
-                inputs = inputs.to(dev)
-                labels = labels.to(dev)
-
-                outputs = net(inputs)
-            
-            elif net.__class__.__name__ == 'LSTMSiameseNet':
-
-                inputs1, inputs2, labels = data
-                inputs1 = inputs1.squeeze().long()
-                inputs2 = inputs2.squeeze().long()
-                labels = labels.reshape(-1,1).float()
-                inputs1 = inputs1.to(dev)
-                inputs2 = inputs2.to(dev)
-                labels = labels.to(dev)
-
-                outputs = net(inputs1, inputs2)
-
-            
-            
+            outputs = net(inputs)
             predicted = torch.round(outputs)
             #_, predicted = torch.max(outputs.data, 1)
             #NEED TO SEE IF THIS IS THE RIGHT WAY TO DO THIS FOR MY LOSS FUNCTION
@@ -313,4 +275,4 @@ def evaluate(val_loader, D, net, dev):
     print('F1 score on validation set: %d %%' % (
         100 *  (2*tp) / (2*tp + fp + fn)))
     
-net.train()
+    net.train()
