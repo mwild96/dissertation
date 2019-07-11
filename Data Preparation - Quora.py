@@ -136,8 +136,25 @@ pd.DataFrame(quora_val_fasttext_SIF).to_csv('Data\QuoraDuplicateQuestions\quora_
 
 
 
+##BASELINE: RANDOMLY INITIALIZED WORD EMBEDDINGS##
+vocab = embedder.build_vocabulary(quora_train, 'question1', 'question2', 300)
+question1_weight_dict = embedder.SIF_weights(quora_train, 'question1')
+question2_weight_dict = embedder.SIF_weights(quora_train, 'question2')
 
+#train
+quora_train_random_SIF = embedder.weighted_average_embedding_array('random', quora_train, 'question1', 'question2', question1_weight_dict, question2_weight_dict, vocabulary = vocab)
+quora_train_random_SIF = np.concatenate((quora_train_random_SIF, quora_labels_train.values.reshape(-1,1)), axis = 1)
+pd.DataFrame(quora_train_random_SIF).to_csv('Data\QuoraDuplicateQuestions\quora_train_random_SIF.csv', index = False)
 
+#val
+quora_val_random_SIF = embedder.weighted_average_embedding_array('random', quora_val, 'question1', 'question2', question1_weight_dict, question2_weight_dict, vocabulary = vocab)
+quora_val_random_SIF = np.concatenate((quora_val_random_SIF, quora_labels_val.values.reshape(-1,1)), axis = 1)
+pd.DataFrame(quora_val_random_SIF).to_csv('Data\QuoraDuplicateQuestions\quora_val_random_SIF.csv', index = False)
+
+#test
+quora_test_random_SIF = embedder.weighted_average_embedding_array('random', quora_test, 'question1', 'question2', question1_weight_dict, question2_weight_dict, vocabulary = vocab)
+quora_test_random_SIF = np.concatenate((quora_test_random_SIF, quora_labels_test.values.reshape(-1,1)), axis = 1)
+pd.DataFrame(quora_test_random_SIF).to_csv('Data\QuoraDuplicateQuestions\quora_test_random_SIF.csv', index = False)
 
 
 
