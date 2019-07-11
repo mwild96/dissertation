@@ -14,7 +14,29 @@ import torch
 #nltk.download('punkt')
 
 
+def build_vocabulary(df, text_column1, text_column2, embedding_dim):
+    '''
+    This function builds a vocabulary and corresponding (randomly initialized) word embeddings for a pair of 
+    record linkage datasets, given the text field from each dataset.
+    '''
+    
+    text1 = df[text_column1].apply(str).apply(lambda x: re.sub('n\'t', ' not', x))
+    text2 = df[text_column2].apply(str).apply(lambda x: re.sub('n\'t', ' not', x))
+    
+    column1_list = text1.apply(str).apply(nltk.tokenize.word_tokenize).values.tolist()
+    column2_list = text2.apply(str).apply(nltk.tokenize.word_tokenize).values.tolist()
+    
+    df_vocab = list(set([item for sublist in column1_list for item in sublist] + \
+                        [item for sublist in column2_list for item in sublist]))
 
+    word_embeddings = []
+    for i in tqdm.tqdm(range(len(words))):
+        word_embeddings.append(np.random.rand(embedding_dim,))
+        
+    vocab = zip(words, word_embeddings)
+    
+    return vocab
+    
 def expand_vocabulary(original_vocab, df, text_column1, text_column2, embedding_dim):
     '''
     Add out-of-vocabulary words to the vocabulary of the pre-trained word embeddings
