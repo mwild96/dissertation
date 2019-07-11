@@ -5,11 +5,6 @@ Created on Mon Jun 17 11:44:34 2019
 @author: Monica
 """
 
-import os
-
-os.chdir(r'C:\Users\Monica\Documents\ORwDS MSc\Dissertation')
-
-
 import pandas as pd
 import sklearn.model_selection
 import gensim.downloader as api
