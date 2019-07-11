@@ -14,14 +14,10 @@ import pandas as pd
 import sklearn.model_selection
 import gensim.downloader as api
 import embedder
-import chardet
 #80870
 
 #import data
-with open('Data\QuoraDuplicateQuestions\questions.csv', 'rb') as f:
-    result = chardet.detect(f.read())
-
-quora = pd.read_csv('Data\QuoraDuplicateQuestions\questions.csv', header = 0, encoding = result['encoding'])
+quora = pd.read_csv('Data\QuoraDuplicateQuestions\questions.csv', header = 0, encoding = 'utf-8')
 
 
 #for train-val-test split we use the ratio 3:1:1 according to the paper Design Space Exploration
@@ -50,43 +46,100 @@ quora_test.to_csv('Data\QuoraDuplicateQuestions\quora_test.csv', index = False)
 #word2vec SIF
 vocab = api.load('word2vec-google-news-300')
 
+
 #these steps should be done only on the training set
 embedder.expand_vocabulary(vocab, quora_train, 'question1', 'question2', 300)
 question1_weight_dict = embedder.SIF_weights(quora_train, 'question1') #I THINK IT'S VERY IMPORTANT THAT TRAIN GOES THROUGH THIS
 question2_weight_dict = embedder.SIF_weights(quora_train, 'question2') #BUT REALIZE THAT WILL CREATE PROBLEMS WITH VAL
 
 #now apply to all data
-quora_train_SIF = embedder.weighted_average_embedding_array('word2vec', vocab, quora_train, 'question1', 'question2', question1_weight_dict, question1_weight_dict, 25, 300)
-quora_train_SIF.to_csv('Data\QuoraDuplicateQuestions\quora_train_SIF.csv', index = False)
+#choose 31 max tokens because that is the 99th percentile across the two fields
+quora_train_word2vec_SIF = embedder.weighted_average_embedding_array('word2vec', quora_train, 'question1', 'question2', question1_weight_dict, question2_weight_dict, vocabulary = vocab)
+quora_train_word2vec_SIF.to_csv('Data\QuoraDuplicateQuestions\quora_train_word2vec_SIF.csv', index = False)
 
 
 #but in reality we have to do it in four parts
-quora_train_SIF1 = embedder.weighted_average_embedding_array('word2vec', vocab, quora_train.iloc[0:60652,:], 'question1', 'question2', question1_weight_dict, question1_weight_dict, 25, 300)
-pd.DataFrame(quora_train_SIF1).to_csv('Data\QuoraDuplicateQuestions\quora_train_SIF1.csv', index = False)
-
-quora_train_SIF2 = embedder.weighted_average_embedding_array('word2vec', vocab, quora_train.iloc[60652:121305,:], 'question1', 'question2', question1_weight_dict, question1_weight_dict, 25, 300)
-pd.DataFrame(quora_train_SIF2).to_csv('Data\QuoraDuplicateQuestions\quora_train_SIF2.csv', index = False)
+quora_train_word2vec_SIF1 = embedder.weighted_average_embedding_array('word2vec', quora_train.iloc[0:60652,:], 'question1', 'question2', question1_weight_dict, question2_weight_dict, vocabulary = vocab)
+pd.DataFrame(quora_train_word2vec_SIF1).to_csv('Data\QuoraDuplicateQuestions\quora_train_word2vec_SIF1.csv', index = False)
 
 
-quora_train_SIF3 = embedder.weighted_average_embedding_array('word2vec', vocab, quora_train.iloc[121305:181957,:], 'question1', 'question2', question1_weight_dict, question1_weight_dict, 25, 300)
-pd.DataFrame(quora_train_SIF3).to_csv('Data\QuoraDuplicateQuestions\quora_train_SIF3.csv', index = False)
+
+quora_train_word2vec_SIF2 = embedder.weighted_average_embedding_array('word2vec', quora_train.iloc[60652:121305,:], 'question1', 'question2', question1_weight_dict, question2_weight_dict, vocabulary = vocab)
+pd.DataFrame(quora_train_word2vec_SIF2).to_csv('Data\QuoraDuplicateQuestions\quora_train_word2vec_SIF2.csv', index = False)
 
 
-quora_train_SIF4 = embedder.weighted_average_embedding_array('word2vec', vocab, quora_train.iloc[181957:,:], 'question1', 'question2', question1_weight_dict, question1_weight_dict, 25, 300)
-pd.DataFrame(quora_train_SIF4).to_csv('Data\QuoraDuplicateQuestions\quora_train_SIF4.csv', index = False)
 
-#there should be no reason that these should have gotten shuffled...right...
-quora_labels_train.to_csv('Data\QuoraDuplicateQuestions\quora_train_labels.csv')
+quora_train_word2vec_SIF3 = embedder.weighted_average_embedding_array('word2vec', quora_train.iloc[121305:181957,:], 'question1', 'question2', question1_weight_dict, question2_weight_dict, vocabulary = vocab)
+pd.DataFrame(quora_train_word2vec_SIF3).to_csv('Data\QuoraDuplicateQuestions\quora_train_word2vec_SIF3.csv', index = False)
+
+
+
+quora_train_word2vec_SIF4 = embedder.weighted_average_embedding_array('word2vec', quora_train.iloc[181957:,:], 'question1', 'question2', question1_weight_dict, question2_weight_dict, vocabulary = vocab)
+pd.DataFrame(quora_train_word2vec_SIF4).to_csv('Data\QuoraDuplicateQuestions\quora_train_word2vec_SIF4.csv', index = False)
 
 
 
 
 #DONE 
-quora_val_SIF = embedder.weighted_average_embedding_array('word2vec', vocab, quora_val, 'question1', 'question2', question1_weight_dict, question1_weight_dict, 25, 300)
-pd.DataFrame(quora_val_SIF).to_csv('Data\QuoraDuplicateQuestions\quora_val_SIF.csv', index = False)
-quora_labels_val.to_csv('Data\QuoraDuplicateQuestions\quora_val_labels.csv')
-
+quora_val_word2vec_SIF = embedder.weighted_average_embedding_array('word2vec', quora_val, 'question1', 'question2', question1_weight_dict, question2_weight_dict, vocabulary = vocab)
+pd.DataFrame(quora_val_word2vec_SIF).to_csv('Data\QuoraDuplicateQuestions\quora_val_word2vec_SIF.csv', index = False)
 
 #not done yet
-quora_test_SIF = embedder.weighted_average_embedding_array('word2vec', vocab, quora_test, 'question1', 'question2', question1_weight_dict, question1_weight_dict, 25, 300)
-quora_test_SIF.to_csv('Data\QuoraDuplicateQuestions\quora_test_SIF.csv', index = False)
+quora_test_word2vec_SIF = embedder.weighted_average_embedding_array('word2vec', vocab, quora_test, 'question1', 'question2', question1_weight_dict, question1_weight_dict, 31, 300)
+quora_test_word2vec_SIF.to_csv('Data\QuoraDuplicateQuestions\quora_test_word2vec_SIF.csv', index = False)
+
+
+
+
+
+
+
+
+
+#fasttext SIF
+vocab = api.load('fasttext-wiki-news-subwords-300')
+
+#these steps should be done only on the training set
+embedder.expand_vocabulary(vocab, quora_train, 'question1', 'question2', 300)
+question1_weight_dict = embedder.SIF_weights(quora_train, 'question1')#I think this is the same regardless of the vocabulary right?
+question2_weight_dict = embedder.SIF_weights(quora_train, 'question2') 
+
+
+#TRAIN
+quora_train_fasttext_SIF1 = embedder.weighted_average_embedding_array('fasttext', quora_train.iloc[0:60652,:], 'question1', 'question2', question1_weight_dict, question2_weight_dict, vocabulary = vocab)
+pd.DataFrame(quora_train_fasttext_SIF1).to_csv('Data\QuoraDuplicateQuestions\quora_train_fasttext_SIF1.csv', index = False)
+
+
+
+quora_train_fasttext_SIF2 = embedder.weighted_average_embedding_array('fasttext', quora_train.iloc[60652:121305,:], 'question1', 'question2', question1_weight_dict, question2_weight_dict, vocabulary = vocab)
+pd.DataFrame(quora_train_fasttext_SIF2).to_csv('Data\QuoraDuplicateQuestions\quora_train_fasttext_SIF2.csv', index = False)
+
+
+
+quora_train_fasttext_SIF3 = embedder.weighted_average_embedding_array('fasttext', quora_train.iloc[121305:181957,:], 'question1', 'question2', question1_weight_dict, question2_weight_dict, vocabulary = vocab)
+pd.DataFrame(quora_train_fasttext_SIF3).to_csv('Data\QuoraDuplicateQuestions\quora_fasttext_fasttext_SIF3.csv', index = False)
+
+
+
+quora_train_fasttext_SIF4 = embedder.weighted_average_embedding_array('fasttext', quora_train.iloc[181957:,:], 'question1', 'question2', question1_weight_dict, question2_weight_dict, vocabulary = vocab)
+pd.DataFrame(quora_train_fasttext_SIF4).to_csv('Data\QuoraDuplicateQuestions\quora_train_fasttext_SIF4.csv', index = False)
+
+
+
+
+
+#VAL
+quora_val_fasttext_SIF = embedder.weighted_average_embedding_array('fasttext', quora_val, 'question1', 'question2', question1_weight_dict, question2_weight_dict, vocabulary = vocab)
+pd.DataFrame(quora_val_fasttext_SIF).to_csv('Data\QuoraDuplicateQuestions\quora_val_fasttext_SIF.csv', index = False)
+
+
+
+
+
+
+
+
+
+
+
+
