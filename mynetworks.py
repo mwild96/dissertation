@@ -117,10 +117,10 @@ class LSTMSiameseNet(nn.Module):
         #DO THE EMBEDDING STEP
         x = self.embedding(x)#.long()
         #https://towardsdatascience.com/taming-lstms-variable-sized-mini-batches-and-why-pytorch-is-good-for-your-health-61d35642972e
-        x = rnn.pack_padded_sequence(x, self.max_tokens, batch_first=True)
+        #x = rnn.pack_padded_sequence(x, self.max_tokens, batch_first=True)
         _, x = self.lstm(x) #first item is all hidden states, second is most recent hidden state
         #I think the paper just uses the last hidden state
-        x, _ = torch.nn.utils.rnn.pad_packed_sequence(x, batch_first=True)
+        #x, _ = torch.nn.utils.rnn.pad_packed_sequence(x, batch_first=True)
         #I can't tell if we're going to be okay without this or not
         x = torch.cat(x)
         x = torch.mean(x, dim = 1) #I'M NOT SURE IF I'M DOING THIS RIGHT
