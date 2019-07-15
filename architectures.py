@@ -2,11 +2,10 @@
 # -*- coding: utf-8 -*-
 """
 Created on Fri Jun 21 09:51:16 2019
-
 @author: s1834310
 """
 
-
+import re
 import numpy as np
 import pandas as pd
 import matplotlib
@@ -17,6 +16,8 @@ import torch
 #import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 import torch.nn as nn
+import pytorch_pretrained_bert as bert
+import allennlp.modules.elmo as elmo
 #import torch.optim as optim
 #import torch.nn.utils.rnn as rnn
 import mynetworks
@@ -43,56 +44,83 @@ class SIFDataset(Dataset):
  
         return embedding, label
     
-   
     
 class RawTextDataset(Dataset):
     
-    def __init__(self, file_path, text_column1, text_column2, vocab, max_tokens):
+    def __init__(self, file_path, text_column1, text_column2, max_tokens, word_embedding_type, vocab = None):
         self.data = pd.read_csv(file_path, header = 0)
         self.text_column1 = text_column1
         self.text_column2 = text_column2
-        self.vocab = vocab
         self.max_tokens = max_tokens
+        self.word_embedding_type = word_embedding_type
+        self.vocab = vocab
+        if word_embedding_type == 'bert':
+            self.tokenizer = bert.BertTokenizer.from_pretrained('bert-base-uncased')
+            
         
     def __len__(self):
         return len(self.data)
     
     def __getitem__(self, index):
         
-        text1 = pd.Series(self.data.loc[self.data.index[index], 
-                                        self.text_column1]).apply(str).apply(nltk.tokenize.word_tokenize)
-        text2 = pd.Series(self.data.loc[self.data.index[index], 
-                                        self.text_column2]).apply(str).apply(nltk.tokenize.word_tokenize)
-        
-        
-        text1 = text1.apply(lambda x: x + ['<PAD>'] * (self.max_tokens - len(x)) if 
-                            len(x) < self.max_tokens else x[0:self.max_tokens])
-        text2 = text2.apply(lambda x: x + ['<PAD>'] * (self.max_tokens - len(x)) if 
-                            len(x) < self.max_tokens else x[0:self.max_tokens])
-        
-        text1 = text1.apply(lambda x: embedder.word2index(x, self.vocab))
-        text2 = text2.apply(lambda x: embedder.word2index(x, self.vocab))
-    
-    
-        #text1 = nltk.tokenize.word_tokenize(self.data.loc[self.data.index[index], self.text_column1])
-        #text2 = nltk.tokenize.word_tokenize(self.data.loc[self.data.index[index], self.text_column1])
-        
-        #text1 = text1 + ['<PAD>'] * (self.max_tokens - len(text1)) if len(text1) < self.max_tokens else text1[0:self.max_tokens]
-        #text2 = text2 + ['<PAD>'] * (self.max_tokens - len(text2)) if len(text2) < self.max_tokens else text2[0:self.max_tokens]
-        
-        
-        #text1 = embedder.word2index(text1, self.vocab)
-        #text2 = embedder.word2index(text2, self.vocab)
-        
-        
         label = self.data.iloc[index,self.data.shape[1]-1]
         
-        return torch.tensor(text1), torch.tensor(text2), torch.tensor(label)
+        if self.word_embedding_type != 'bert':
+            
+            text1 = pd.Series(self.data.loc[self.data.index[index], self.text_column1]).apply(str).apply(lambda x: re.sub('n\'t', ' not', x))
+            text2 = pd.Series(self.data.loc[self.data.index[index], self.text_column2]).apply(str).apply(lambda x: re.sub('n\'t', ' not', x))
+            
+            text1 = text1.apply(str).apply(nltk.tokenize.word_tokenize)
+            text2 = text2.apply(str).apply(nltk.tokenize.word_tokenize)
+            
+            
+            if self.word_embedding_type == 'fasttext' or self.word_embedding_type == 'word2vec':
+            
+                text1 = text1.apply(lambda x: x + ['[PAD]'] * (self.max_tokens - len(x)) if len(x) < self.max_tokens else x[0:self.max_tokens])
+                text2 = text2.apply(lambda x: x + ['[PAD]'] * (self.max_tokens - len(x)) if len(x) < self.max_tokens else x[0:self.max_tokens])
+                
+                text1 = text1.apply(lambda x: embedder.word2index(x, self.vocab))
+                text2 = text2.apply(lambda x: embedder.word2index(x, self.vocab))
+                
+                text1 = torch.tensor(text1)
+                text2 = torch.tensor(text2)
+                
+                
+            elif self.word_embedding_type == 'elmo':
+                
+                #***NOTICE IM CURRENTLY DOING NO PADDING***#
+                
+                text1 = elmo.batch_to_ids(text1)
+                text2 = elmo.batch_to_ids(text2)
+            
+            return text1, text2, torch.tensor(label)
+        
+        if self.word_embedding_type == 'bert':
+            
+                
+                #***NOTICE IM CURRENTLY DOING NO PADDING***#
     
+                #note: BERT is trained on "combined token length" of <= 512 tokens
+                text1 = pd.Series(self.data.loc[self.data.index[index], self.text_column1]).apply(lambda x: str(x)[0:513] if len(str(x)) > 512 else str(x))
+                text2 = pd.Series(self.data.loc[self.data.index[index], self.text_column2]).apply(lambda x: str(x)[0:513] if len(str(x)) > 512 else str(x))
+                
+                
+                text1 = text1.apply(lambda x: "[CLS] " + str(x) + " [SEP]").apply(self.tokenizer.tokenize)
+                text2 = text2.apply(lambda x: "[CLS] " + str(x) + " [SEP]").apply(self.tokenizer.tokenize)
+
+                
+                text1 = text1.apply(self.tokenizer.convert_tokens_to_ids)
+                text2 = text2.apply(self.tokenizer.convert_tokens_to_ids)
+                
+                segments1 = text1.apply(lambda x: [1]*len(x))
+                segments2 = text2.apply(lambda x: [1]*len(x))
+                
+                return torch.tensor(text1), torch.tensor(segments1), torch.tensor(text2), torch.tensor(segments2), torch.tensor(label)
+
+        
+
     
-    
-    
-def data_loaders_builder(dataset_class, batch_size, train_path = None, val_path = None, D = None,
+def data_loaders_builder(dataset_class, batch_size, word_embedding_type, train_path, val_path, D = None,
                          text_column1 = None, text_column2 = None, vocab = None, max_tokens = None, vocab_size = None):
     
     if dataset_class == 'SIFDataset':
@@ -104,13 +132,14 @@ def data_loaders_builder(dataset_class, batch_size, train_path = None, val_path 
         val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=True)
     
     if dataset_class == 'RawTextDataset':
-        train_set = eval(dataset_class + '(train_path, text_column1, text_column2, vocab, max_tokens)')#, vocab_size
+        
+        train_set = eval(dataset_class + '(train_path, text_column1, text_column2, max_tokens, word_embedding_type, vocab)')#, vocab_size
         #idk if this is going to work with the padding thing we've done because
         #I think this loads it little by little? I can't tell if this only does it when DataLoader tells it to or if it does it all at once
         #and then DataLoader loads it little by little
         train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
         
-        val_set = eval(dataset_class + '(val_path, text_column1, text_column2, vocab, max_tokens)')#, vocab_size
+        val_set = eval(dataset_class + '(val_path, text_column1, text_column2, max_tokens, word_embedding_type, vocab)')#, vocab_size
         val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=True)
     
     return train_loader, val_loader     
@@ -151,62 +180,126 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
         running_loss_val = 0.0
 
         for i, data in enumerate(train_loader, 0):
-            # get the inputs; data is a list of [inputs, labels]
-            inputs, labels = data
-            inputs = inputs.view(-1,D).float()
-            labels = labels.view(-1,1).float()
-            inputs = inputs.to(dev)
-            labels = labels.to(dev)
             
+            if net.__class__.__name__ == 'HighwayReluNet':
+                if i == 0:
+                    print('HELLO WORLD')
+                # get the inputs; data is a list of [inputs, labels]
+                inputs, labels = data
+                inputs = inputs.squeeze().float()#.view(-1,D)
+                labels = labels.reshape(-1,1).float()
+                inputs = inputs.to(dev)
+                labels = labels.to(dev)
+
+
     
-            # zero the parameter gradients
-            optimizer.zero_grad()
+                # zero the parameter gradients
+                optimizer.zero_grad()
     
-            # forward + backward + optimize
-            outputs = net(inputs)
+                # forward + backward + optimize
+                outputs = net(inputs)
+                
+                
+            elif net.__class__.__name__ == 'LSTMSiameseNet' or net.__class__.__name__ == 'ElmoLSTMSiameseNet':
+
+                inputs1, inputs2, labels = data
+                inputs1 = inputs1.squeeze().long()
+                inputs2 = inputs2.squeeze().long()
+                labels = labels.reshape(-1,1).float()
+                inputs1 = inputs1.to(dev)
+                inputs2 = inputs2.to(dev)
+                labels = labels.to(dev)
+
+                # zero the parameter gradients
+                optimizer.zero_grad()
+
+                # forward + backward + optimize
+                outputs = net(inputs1, inputs2) 
+                
+            elif net.__class__.__name__ == 'BertLSTMSiameseNet':
+                
+                tokens1, segments1, tokens2, segments2, labels = data
+                tokens1 = tokens1.to(dev)
+                segments1 = segments1.to(dev)
+                tokens2 = tokens2.to(dev)
+                segments2 = segments2.to(dev)
+                
+                optimizer.zero_grad()
+                
+                outputs = net(tokens1, segments1, tokens2, segments2)
+                
+                
             loss = criterion(outputs, labels).to(dev)
             loss.backward()
             optimizer.step()
             
             #append loss
-            running_loss += loss.item()/batch_size #average loss per item 
+            running_loss += loss.item()#average loss per item 
            
-        if i*batch_size <= train_size:
+            if i*batch_size >= train_size:
 
-            train_loss_over_time.append(running_loss)
+                train_loss_over_time.append(running_loss/train_size)#do average per item so magnitude is comparable against validation
 
-            if val == True: 
-                net.eval()
+                if val == True: 
+                    net.eval()
 
-                with torch.no_grad():
+                    with torch.no_grad():
 
-                    for data in val_loader:
-                        inputs, labels = data
-                        inputs = inputs.view(-1,D).float()#.cuda(async=True)
-                        labels = labels.view(-1,1).float()#.cuda(async=True)
-                        #inputs.cuda()
-                        #labels.cuda()
-                        inputs = inputs.to(dev)
-                        labels = labels.to(dev)
+                        for data in val_loader:
 
-                        outputs = net(inputs)
-                        loss = criterion(outputs, labels)
-                        running_loss_val += loss.item()
+                            if net.__class__.__name__ == 'HighwayReluNet':
+
+                                inputs, labels = data
+                                inputs = inputs.squeeze().float()
+                                labels = labels.reshape(-1,1).float()
+                                inputs = inputs.to(dev)
+                                labels = labels.to(dev)
+
+                                outputs = net(inputs)
+
+                            elif net.__class__.__name__ == 'LSTMSiameseNet':
+
+                                inputs1, inputs2, labels = data
+                                inputs1 = inputs1.squeeze().long()
+                                inputs2 = inputs2.squeeze().long()
+                                labels = labels.reshape(-1,1).float()
+                                inputs1 = inputs1.to(dev)
+                                inputs2 = inputs2.to(dev)
+                                labels = labels.to(dev)
+
+                                outputs = net(inputs1, inputs2)
 
 
-                val_loss_over_time.append(running_loss_val)
+                            elif net.__class__.__name__ == 'BertLSTMSiameseNet':
 
-                net.train()
+                                tokens1, segments1, tokens2, segments2, labels = data
+                                tokens1 = tokens1.to(dev)
+                                segments1 = segments1.to(dev)
+                                tokens2 = tokens2.to(dev)
+                                segments2 = segments2.to(dev)
 
-            torch.save({ #save model parameters
-                 'epoch': e,
-                 'model_state_dict': net.state_dict(),
-                 'optimizer_state_dict': optimizer.state_dict(),
-                 'loss': running_loss
-                 }, output_filename + str(e) + '.pth')
+                                outputs = net(tokens1, segments1, tokens2, segments2)
+
+
+                            loss = criterion(outputs, labels)
+                            running_loss_val += loss.item()
+
+
+                    val_loss_over_time.append(running_loss_val/val_size)#look at the average loss so we can try to make it comparable magnitude wise to the train set
+
+                    net.train()
+
+                torch.save({ #save model parameters
+                     'epoch': e,
+                     'model_state_dict': net.state_dict(),
+                     'optimizer_state_dict': optimizer.state_dict(),
+                     'loss': running_loss
+                     }, output_filename + str(e) + '.pth')
     
     print('Finished Training')
 
+    print(train_loss_over_time)
+    print(val_loss_over_time)
     
     if val == True:
         p = plt.plot(np.arange(len(train_loss_over_time)), train_loss_over_time, np.arange(len(val_loss_over_time)), val_loss_over_time)
@@ -243,13 +336,40 @@ def evaluate(val_loader, D, net, dev):
     
     with torch.no_grad():
         for data in val_loader:
-            inputs, labels = data
-            inputs = inputs.view(-1,D).float()
-            labels = labels.view(-1,1).float()
-            inputs = inputs.to(dev)
-            labels = labels.to(dev)
             
-            outputs = net(inputs)
+            if net.__class__.__name__ == 'HighwayReluNet':
+
+                inputs, labels = data
+                inputs = inputs.squeeze().float()
+                labels = labels.reshape(-1,1).float()
+                inputs = inputs.to(dev)
+                labels = labels.to(dev)
+
+                outputs = net(inputs)
+
+            elif net.__class__.__name__ == 'LSTMSiameseNet':
+
+                inputs1, inputs2, labels = data
+                inputs1 = inputs1.squeeze().long()
+                inputs2 = inputs2.squeeze().long()
+                labels = labels.reshape(-1,1).float()
+                inputs1 = inputs1.to(dev)
+                inputs2 = inputs2.to(dev)
+                labels = labels.to(dev)
+
+                outputs = net(inputs1, inputs2)
+                
+                
+            elif net.__class__.__name__ == 'BertLSTMSiameseNet':
+    
+                tokens1, segments1, tokens2, segments2, labels = data
+                tokens1 = tokens1.to(dev)
+                segments1 = segments1.to(dev)
+                tokens2 = tokens2.to(dev)
+                segments2 = segments2.to(dev)
+                
+                outputs = net(tokens1, segments1, tokens2, segments2)
+
             predicted = torch.round(outputs)
             #_, predicted = torch.max(outputs.data, 1)
             #NEED TO SEE IF THIS IS THE RIGHT WAY TO DO THIS FOR MY LOSS FUNCTION
@@ -257,7 +377,8 @@ def evaluate(val_loader, D, net, dev):
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
            
-           
+            predicted = predicted.cpu()
+            
             fn += (np.logical_and(predicted == 0, labels == 1)).sum().item()
             fp += (np.logical_and(predicted == 1, labels == 0)).sum().item()
             tn += (np.logical_and(predicted == 0, labels == 0)).sum().item()
