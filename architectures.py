@@ -269,7 +269,7 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
             running_loss += loss.item()#average loss per item 
            
             #if (i+1)*batch_size >= train_size:
-            if (i+1) >= train_loader.__len__()
+            if (i+1) >= train_loader.__len__():
 
                 train_loss_over_time.append(running_loss/train_size)#do average per item so magnitude is comparable against validation
 
