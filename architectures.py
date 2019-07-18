@@ -249,12 +249,20 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
             elif net.__class__.__name__ == 'BertLSTMSiameseNet':
                 
                 tokens1, segments1, input_mask1, tokens2, segments2, input_mask2, labels = data
+                tokens1 = tokens1.long()
+                segments1 = segments1.long()
+                input_mask1 = input_mask1.long()
+                tokens2 = tokens2.long()
+                segments2 = segments2.long()
+                input_mask2 = input_mask2.long()
+                labels = labels.float()
                 tokens1 = tokens1.to(dev)
                 segments1 = segments1.to(dev)
                 input_mask1 = input_mask1.to(dev)
                 tokens2 = tokens2.to(dev)
                 segments2 = segments2.to(dev)
                 input_mask2 = input_mask2.to(dev)
+                labels = labels.to(dev)
                 
                 optimizer.zero_grad()
                 
