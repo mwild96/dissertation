@@ -14,26 +14,28 @@ import torch
 #nltk.download('punkt')
 
 
-def build_vocabulary(df, text_column1, text_column2, embedding_dim):
+def build_vocabulary(df, text_column1, text_column2, embedding_dim, seed):
     '''
     This function builds a vocabulary and corresponding (randomly initialized) word embeddings for a pair of 
     record linkage datasets, given the text field from each dataset.
-    '''
+    '''    
     
+    np.random.seed(seed)
+
     text1 = df[text_column1].apply(str).apply(lambda x: re.sub('n\'t', ' not', x))
     text2 = df[text_column2].apply(str).apply(lambda x: re.sub('n\'t', ' not', x))
     
     column1_list = text1.apply(str).apply(nltk.tokenize.word_tokenize).values.tolist()
     column2_list = text2.apply(str).apply(nltk.tokenize.word_tokenize).values.tolist()
     
-    df_vocab = list(set([item for sublist in column1_list for item in sublist] + \
+    words = list(set([item for sublist in column1_list for item in sublist] + \
                         [item for sublist in column2_list for item in sublist]))
 
     word_embeddings = []
     for i in tqdm.tqdm(range(len(words))):
         word_embeddings.append(np.random.rand(embedding_dim,))
         
-    vocab = zip(words, word_embeddings)
+    vocab = dict(zip(words, word_embeddings))
     
     return vocab
     
@@ -153,6 +155,8 @@ def weighted_embedding_lookup(embed_type, lst, weight_dict, tokenizer = None, vo
             segments_tensors = torch.tensor([segments_ids])
             tokens_tensor = torch.tensor([indexed_tokens])
             
+            model.eval()
+
             with torch.no_grad():
                 encoded_layers, _ = model(tokens_tensor, segments_tensors)
             
@@ -215,8 +219,10 @@ def weighted_average_embedding_array(embed_type, df, text_column1, text_column2,
     
     
     #get weighted embeddings
-    text1 = text1.progress_apply(lambda x: weighted_embedding_lookup(embed_type, x, weight_dict1, tokenizer, vocabulary, model))
-    text2 = text2.progress_apply(lambda x: weighted_embedding_lookup(embed_type, x, weight_dict2, tokenizer, vocabulary, model))
+    text1 = text1.progress_apply(lambda x: weighted_embedding_lookup(embed_type, x, weight_dict1, 
+                                                                     tokenizer, vocabulary, model))
+    text2 = text2.progress_apply(lambda x: weighted_embedding_lookup(embed_type, x, weight_dict2, 
+                                                                     tokenizer, vocabulary, model))
     
     
     #weighted average
@@ -235,3 +241,27 @@ def word2index(lst, vocab):
     for i in range(len(lst)):
         lst[i] = vocab.vocab.get(lst[i]).index
     return lst
+
+
+
+def bert_input_builder(string, tokenizer, max_tokens, padding = True):
+    '''
+    Inspired by: https://medium.com/swlh/a-simple-guide-on-using-bert-for-text-classification-bbf041ac8d04
+    '''
+    
+    tokens = tokenizer.tokenize(string)
+    if len(tokens) > max_tokens:
+        tokens = tokens[0:max_tokens]
+    tokens = ["[CLS]"] + tokens + ["[SEP]"]
+    indexed_tokens = tokenizer.convert_tokens_to_ids(tokens)
+    segments = [0] * len(tokens) #<- everything should have the same segment id
+    input_mask = [1] * len(tokens)
+    
+    
+    if padding == True:
+        padding = [0]*(max_tokens + 2 - len(tokens)) #don't include cls and sep as tokens
+        indexed_tokens += padding
+        segments += padding
+        input_mask += padding
+        
+    return indexed_tokens, segments, input_mask

@@ -16,7 +16,8 @@ import torch
 #import torch.nn.functional as F
 from torch.utils.data import DataLoader, Dataset
 import torch.nn as nn
-import pytorch_pretrained_bert as bert
+#import pytorch_pretrained_bert as bert
+import pytorch_transformers as bert
 import allennlp.modules.elmo as elmo
 #import torch.optim as optim
 #import torch.nn.utils.rnn as rnn
@@ -55,7 +56,7 @@ class RawTextDataset(Dataset):
         self.word_embedding_type = word_embedding_type
         self.vocab = vocab
         if word_embedding_type == 'bert':
-            self.tokenizer = bert.BertTokenizer.from_pretrained('bert-base-uncased')
+            self.tokenizer = bert.BertTokenizer.from_pretrained('/home/s1834310/Dissertation/PretrainedBert')
             
         
     def __len__(self):
@@ -88,10 +89,12 @@ class RawTextDataset(Dataset):
                 
             elif self.word_embedding_type == 'elmo':
                 
-                #***NOTICE IM CURRENTLY DOING NO PADDING***#
-                
                 text1 = elmo.batch_to_ids(text1)
                 text2 = elmo.batch_to_ids(text2)
+                
+                
+                text1 = text1.apply(lambda x: x + [0] * (self.max_tokens - len(x)) if len(x) < self.max_tokens else x[0:self.max_tokens])
+                text2 = text2.apply(lambda x: x + [0] * (self.max_tokens - len(x)) if len(x) < self.max_tokens else x[0:self.max_tokens])
             
             return text1, text2, torch.tensor(label)
         
@@ -101,27 +104,39 @@ class RawTextDataset(Dataset):
                 #***NOTICE IM CURRENTLY DOING NO PADDING***#
     
                 #note: BERT is trained on "combined token length" of <= 512 tokens
-                text1 = pd.Series(self.data.loc[self.data.index[index], self.text_column1]).apply(lambda x: str(x)[0:513] if len(str(x)) > 512 else str(x))
-                text2 = pd.Series(self.data.loc[self.data.index[index], self.text_column2]).apply(lambda x: str(x)[0:513] if len(str(x)) > 512 else str(x))
+                
+                threshold = min(512, self.max_tokens)
+                
+                bert_df1 = pd.Series(self.data.loc[self.data.index[index], 
+                                                   self.text_column1]).apply(lambda x: embedder.bert_input_builder(str(x), self.tokenizer, threshold))
+                
+                bert_df2 = pd.Series(self.data.loc[self.data.index[index], 
+                                   self.text_column2]).apply(lambda x: embedder.bert_input_builder(str(x), self.tokenizer, threshold))
                 
                 
-                text1 = text1.apply(lambda x: "[CLS] " + str(x) + " [SEP]").apply(self.tokenizer.tokenize)
-                text2 = text2.apply(lambda x: "[CLS] " + str(x) + " [SEP]").apply(self.tokenizer.tokenize)
+                bert_df1 = bert_df1.apply(np.stack).apply(lambda x: np.reshape(x, (1,3*(threshold+2))))
+                bert_df2 = bert_df2.apply(np.stack).apply(lambda x: np.reshape(x, (1,3*(threshold+2))))
+                
+                bert_df1 = np.stack(bert_df1).squeeze()
+                bert_df2 = np.stack(bert_df2).squeeze()
+                
+                
+                indexed_tokens1 = bert_df1[:,0:33]
+                segments1 = bert_df1[:,33:66]
+                input_mask1 = bert_df1[:,66:]
+                
+                indexed_tokens2 = bert_df2[:,0:33]
+                segments2 = bert_df2[:,33:66]
+                input_mask2 = bert_df2[:,66:]
 
                 
-                text1 = text1.apply(self.tokenizer.convert_tokens_to_ids)
-                text2 = text2.apply(self.tokenizer.convert_tokens_to_ids)
-                
-                segments1 = text1.apply(lambda x: [1]*len(x))
-                segments2 = text2.apply(lambda x: [1]*len(x))
-                
-                return torch.tensor(text1), torch.tensor(segments1), torch.tensor(text2), torch.tensor(segments2), torch.tensor(label)
+                return torch.tensor(indexed_tokens1), torch.tensor(segments1), torch.tensor(input_mask1), torch.tensor(text2), torch.tensor(segments2), torch.tensor(input_mask2), torch.tensor(label)
 
         
 
     
 def data_loaders_builder(dataset_class, batch_size, word_embedding_type, train_path, val_path, D = None,
-                         text_column1 = None, text_column2 = None, vocab = None, max_tokens = None, vocab_size = None):
+                         text_column1 = None, text_column2 = None, vocab = None, max_tokens = None):
     
     if dataset_class == 'SIFDataset':
         
@@ -150,19 +165,19 @@ def data_loaders_builder(dataset_class, batch_size, word_embedding_type, train_p
     
 #https://innovationincubator.com/siamese-neural-network-with-pytorch-code-example/    
 class ContrastiveLoss(nn.Module):
-
-      def __init__(self, margin=2.0): #definitely just stole that margin = 2 thing from the link above
+    
+    def __init__(self, margin=2.0): #definitely just stole that margin = 2 thing from the link above
             super(ContrastiveLoss, self).__init__()
             self.margin = margin
 
-      def forward(self, cosine_similarity, label):
-            # Find the pairwise distance or eucledian distance of two output feature vectors
-            #cosine_similarity = F.cosine_similarity(output1, output2)
-            # perform contrastive loss calculation with the distance
-            loss_contrastive = torch.mean(label * torch.pow(0.25*cosine_similarity, 2) +
-            (1 - label) * torch.pow(torch.clamp(self.margin - cosine_similarity, min=0.0), 2))
+    def forward(self, cosine_similarity, label):
+        # Find the pairwise distance or eucledian distance of two output feature vectors
+        #cosine_similarity = F.cosine_similarity(output1, output2)
+        # perform contrastive loss calculation with the distance
+        loss_contrastive = torch.mean(label * torch.pow(0.25*cosine_similarity, 2) +
+        (1 - label) * torch.pow(torch.clamp(self.margin - cosine_similarity, min=0.0), 2))
 
-            return loss_contrastive    
+        return loss_contrastive    
 
     
 
@@ -176,14 +191,13 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
 
     for e in range(epochs):  # loop over the dataset multiple times
     
+        print('EPOCH: ', e)
         running_loss = 0.0
         running_loss_val = 0.0
 
         for i, data in enumerate(train_loader, 0):
             
             if net.__class__.__name__ == 'HighwayReluNet':
-                if i == 0:
-                    print('HELLO WORLD')
                 # get the inputs; data is a list of [inputs, labels]
                 inputs, labels = data
                 inputs = inputs.squeeze().float()#.view(-1,D)
@@ -218,7 +232,7 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
                 
             elif net.__class__.__name__ == 'BertLSTMSiameseNet':
                 
-                tokens1, segments1, tokens2, segments2, labels = data
+                tokens1, segments1, input_mask1, tokens2, segments2, input_mask2, labels = data
                 tokens1 = tokens1.to(dev)
                 segments1 = segments1.to(dev)
                 tokens2 = tokens2.to(dev)
@@ -226,7 +240,7 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
                 
                 optimizer.zero_grad()
                 
-                outputs = net(tokens1, segments1, tokens2, segments2)
+                outputs = net(tokens1, segments1, input_mask1, tokens2, segments2, input_mask2)
                 
                 
             loss = criterion(outputs, labels).to(dev)
@@ -236,7 +250,7 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
             #append loss
             running_loss += loss.item()#average loss per item 
            
-            if i*batch_size >= train_size:
+            if (i+1)*batch_size >= train_size:
 
                 train_loss_over_time.append(running_loss/train_size)#do average per item so magnitude is comparable against validation
 
@@ -272,13 +286,13 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
 
                             elif net.__class__.__name__ == 'BertLSTMSiameseNet':
 
-                                tokens1, segments1, tokens2, segments2, labels = data
+                                tokens1, segments1, input_mask1, tokens2, segments2, input_mask2, labels = data
                                 tokens1 = tokens1.to(dev)
                                 segments1 = segments1.to(dev)
                                 tokens2 = tokens2.to(dev)
                                 segments2 = segments2.to(dev)
 
-                                outputs = net(tokens1, segments1, tokens2, segments2)
+                                outputs = net(tokens1, segments1, input_mask1, tokens2, segments2, input_mask2)
 
 
                             loss = criterion(outputs, labels)
@@ -362,14 +376,17 @@ def evaluate(val_loader, D, net, dev):
                 
             elif net.__class__.__name__ == 'BertLSTMSiameseNet':
     
-                tokens1, segments1, tokens2, segments2, labels = data
+                tokens1, segments1, input_mask1, tokens2, segments2, input_mask2, labels = data
                 tokens1 = tokens1.to(dev)
                 segments1 = segments1.to(dev)
                 tokens2 = tokens2.to(dev)
                 segments2 = segments2.to(dev)
                 
-                outputs = net(tokens1, segments1, tokens2, segments2)
+                outputs = net(tokens1, segments1, input_mask1, tokens2, segments2, input_mask2)
 
+            outputs = outputs.cpu()
+            labels = labels.cpu()
+            
             predicted = torch.round(outputs)
             #_, predicted = torch.max(outputs.data, 1)
             #NEED TO SEE IF THIS IS THE RIGHT WAY TO DO THIS FOR MY LOSS FUNCTION
@@ -377,7 +394,7 @@ def evaluate(val_loader, D, net, dev):
             total += labels.size(0)
             correct += (predicted == labels).sum().item()
            
-            predicted = predicted.cpu()
+            #predicted = predicted.cpu()
             
             fn += (np.logical_and(predicted == 0, labels == 1)).sum().item()
             fp += (np.logical_and(predicted == 1, labels == 0)).sum().item()
