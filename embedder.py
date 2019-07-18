@@ -161,7 +161,7 @@ def weighted_embedding_lookup(embed_type, lst, weight_dict, tokenizer = None, vo
                 encoded_layers, _ = model(tokens_tensor, segments_tensors)
             
             #we'll take the top four layers because that's what they suggest to do in the paper
-            embeddings = np.stack(encoded_layers).squeeze()[8:,:,:] 
+            embeddings = np.stack(encoded_layers).squeeze()[8:12,:,:] 
             embeddings = np.mean(embeddings, axis=0)
             
             

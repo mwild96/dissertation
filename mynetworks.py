@@ -8,8 +8,9 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 #import torch.nn.utils.rnn as rnn
-import pytorch_pretrained_bert as bert
-import allennlp.modules.elmo as elmo
+#import pytorch_pretrained_bert as bert
+import pytorch_transformers as bert
+#import allennlp.modules.elmo as elmo
 
 
 
@@ -171,7 +172,8 @@ class BertLSTMSiameseNet(nn.Module):
         self.out_features = out_features
         self.dropout = dropout
         self.bidirectional = bidirectional
-        self.bert = bert.BertModel.from_pretrained('/home/s1834310/Dissertation/PretrainedBert')
+        self.bert = bert.BertModel.from_pretrained('bert-base-uncased')
+        self.bert = bert.BertModel.from_pretrained('/home/s1834310/Dissertation/PretrainedBert', output_hidden_states=True, output_attentions=True)
                 
         self.lstm = nn.LSTM(input_size = 4*self.embedding_dim, hidden_size = self.hidden_size,
                             num_layers = self.number_layers, dropout = self.dropout, bidirectional = self.bidirectional)
@@ -180,18 +182,19 @@ class BertLSTMSiameseNet(nn.Module):
     
     def forward_once(self, tokens, segments, input_mask):
         self.bert.eval()
-        with torch.no.grad():
-            x, _ = self.bert(tokens, segments, input_mask) 
-
-        x = torch.stack(x).squeeze()[8:,:,:].reshape(1,-1, 4*self.embedding_dim).squeeze() #DOES THIS MAKE SENSE?
+        with torch.no_grad():
+            #x, _ = 
+            print(len(self.bert(tokens, segments, input_mask))) 
+        
+        #x = torch.stack(x).squeeze()[8:12,:,:].reshape(1,-1, 4*self.embedding_dim).squeeze() #DOES THIS MAKE SENSE?
         #according to the BERT paper: "the best performing method is to concatenate the token representations from the top four hidden layers of the pre-trained Transformer"
         #IN THIS CASE HOW DO I TELL THE LSTM WHAT THE PADDING INDEX IS
 	#LIKE IF THE PADDING INDEX FOR BERT IS ZERO HOW DOES OUR LSTM KNOW THAT?
-        _, x = self.lstm(x)
-        x = torch.cat(x)
-        x = torch.mean(x, dim = 1) #I'M NOT SURE IF I'M DOING THIS RIGHT
-        x = self.fc(x) #WHAT IS THE ACTIVATION FUNCTION HERE? none?
-        return x
+        #_, x = self.lstm(x)
+        #x = torch.cat(x)
+        #x = torch.mean(x, dim = 1) #I'M NOT SURE IF I'M DOING THIS RIGHT
+        #x = self.fc(x) #WHAT IS THE ACTIVATION FUNCTION HERE? none?
+        #return x
     
     def forward(self, tokens1, segments1, input_mask1, tokens2, segments2, input_mask2):
         x1 = self.forward_once(tokens1, segments1, input_mask1)

@@ -22,7 +22,7 @@ quora_train, quora_val, quora_labels_train, quora_labels_val = sklearn.model_sel
 
 #prep
 bert_tokenizer = bert.BertTokenizer.from_pretrained('bert-base-uncased')
-bert_model = bert.BertModel.from_pretrained('bert-base-uncased')    
+bert_model = bert.BertModel.from_pretrained('bert-base-uncased', output_hidden_states=True, output_attentions=True)    
 question1_weight_dict = embedder.SIF_weights(quora_train, 'question1')
 question2_weight_dict = embedder.SIF_weights(quora_train, 'question2') 
 

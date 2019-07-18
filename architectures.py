@@ -18,12 +18,15 @@ from torch.utils.data import DataLoader, Dataset
 import torch.nn as nn
 #import pytorch_pretrained_bert as bert
 import pytorch_transformers as bert
-import allennlp.modules.elmo as elmo
+#import allennlp.modules.elmo as elmo
 #import torch.optim as optim
 #import torch.nn.utils.rnn as rnn
 import mynetworks
 import embedder
 
+
+#bert reference
+#https://huggingface.co/pytorch-transformers/model_doc/bert.html#bertmodel
 
 
 ##Dataset Classes
@@ -56,6 +59,7 @@ class RawTextDataset(Dataset):
         self.word_embedding_type = word_embedding_type
         self.vocab = vocab
         if word_embedding_type == 'bert':
+            #self.tokenizer = bert.BertTokenizer.from_pretrained('bert-base-uncased')
             self.tokenizer = bert.BertTokenizer.from_pretrained('/home/s1834310/Dissertation/PretrainedBert')
             
         
@@ -121,16 +125,28 @@ class RawTextDataset(Dataset):
                 bert_df2 = np.stack(bert_df2).squeeze()
                 
                 
-                indexed_tokens1 = bert_df1[:,0:33]
-                segments1 = bert_df1[:,33:66]
-                input_mask1 = bert_df1[:,66:]
+                if bert_df1.ndim == 1:
+                    
+                    indexed_tokens1 = bert_df1[0:33]
+                    segments1 = bert_df1[33:66]
+                    input_mask1 = bert_df1[66:]
+
+                    indexed_tokens2 = bert_df2[0:33]
+                    segments2 = bert_df2[33:66]
+                    input_mask2 = bert_df2[66:]
                 
-                indexed_tokens2 = bert_df2[:,0:33]
-                segments2 = bert_df2[:,33:66]
-                input_mask2 = bert_df2[:,66:]
+                elif bert_df1.ndim == 2:
+                
+                    indexed_tokens1 = bert_df1[:,0:33]
+                    segments1 = bert_df1[:,33:66]
+                    input_mask1 = bert_df1[:,66:]
+
+                    indexed_tokens2 = bert_df2[:,0:33]
+                    segments2 = bert_df2[:,33:66]
+                    input_mask2 = bert_df2[:,66:]
 
                 
-                return torch.tensor(indexed_tokens1), torch.tensor(segments1), torch.tensor(input_mask1), torch.tensor(text2), torch.tensor(segments2), torch.tensor(input_mask2), torch.tensor(label)
+                return torch.tensor(indexed_tokens1), torch.tensor(segments1), torch.tensor(input_mask1), torch.tensor(indexed_tokens2), torch.tensor(segments2), torch.tensor(input_mask2), torch.tensor(label)
 
         
 
@@ -235,8 +251,10 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
                 tokens1, segments1, input_mask1, tokens2, segments2, input_mask2, labels = data
                 tokens1 = tokens1.to(dev)
                 segments1 = segments1.to(dev)
+                input_mask1 = input_mask1.to(dev)
                 tokens2 = tokens2.to(dev)
                 segments2 = segments2.to(dev)
+                input_mask2 = input_mask2.to(dev)
                 
                 optimizer.zero_grad()
                 
@@ -250,7 +268,8 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
             #append loss
             running_loss += loss.item()#average loss per item 
            
-            if (i+1)*batch_size >= train_size:
+            #if (i+1)*batch_size >= train_size:
+            if (i+1) >= train_loader.__len__()
 
                 train_loss_over_time.append(running_loss/train_size)#do average per item so magnitude is comparable against validation
 
