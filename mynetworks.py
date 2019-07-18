@@ -172,7 +172,7 @@ class BertLSTMSiameseNet(nn.Module):
         self.out_features = out_features
         self.dropout = dropout
         self.bidirectional = bidirectional
-        self.bert = bert.BertModel.from_pretrained('bert-base-uncased')
+        #self.bert = bert.BertModel.from_pretrained('bert-base-uncased')
         self.bert = bert.BertModel.from_pretrained('/home/s1834310/Dissertation/PretrainedBert', output_hidden_states=True, output_attentions=True)
                 
         self.lstm = nn.LSTM(input_size = 4*self.embedding_dim, hidden_size = self.hidden_size,
