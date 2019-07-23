@@ -134,6 +134,10 @@ def weighted_embedding_lookup(embed_type, lst, weight_dict, tokenizer = None, vo
         
         if embed_type == 'bert':
             
+            #note: BERT is trained on "combined token length" of <= 512 tokens
+            if len(lst) > 512:
+                lst = lst[0:512]
+            
             for i in range(len(lst)):
                 if lst[i] in weight_dict.keys():
                     pw_list.append(weight_dict[lst[i]])
@@ -142,10 +146,7 @@ def weighted_embedding_lookup(embed_type, lst, weight_dict, tokenizer = None, vo
             
             
             indexed_tokens = tokenizer.convert_tokens_to_ids(lst)
-        
-            #note: BERT is trained on "combined token length" of <= 512 tokens
-            if len(indexed_tokens) > 512:
-                indexed_tokens = indexed_tokens[0:513]
+
                 
                 
             # Define sentence A and B indices associated to 1st and 2nd sentences (see paper)
@@ -158,7 +159,7 @@ def weighted_embedding_lookup(embed_type, lst, weight_dict, tokenizer = None, vo
             model.eval()
 
             with torch.no_grad():
-                encoded_layers, _ = model(tokens_tensor, segments_tensors)
+                encoded_layers, _ = model(tokens_tensor, segments_tensors)[-2:]
             
             #we'll take the top four layers because that's what they suggest to do in the paper
             embeddings = np.stack(encoded_layers).squeeze()[8:12,:,:] 
@@ -237,9 +238,12 @@ def weighted_average_embedding_array(embed_type, df, text_column1, text_column2,
     return np.abs(array1-array2)
 
 
-def word2index(lst, vocab):
+def word2index(lst, vocab, unk_index):
     for i in range(len(lst)):
-        lst[i] = vocab.vocab.get(lst[i]).index
+        if lst[i] in vocab.vocab:
+            lst[i] = vocab.vocab.get(lst[i]).index
+        else:
+            lst[i] = unk_index
     return lst
 
 

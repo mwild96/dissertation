@@ -51,16 +51,17 @@ class SIFDataset(Dataset):
     
 class RawTextDataset(Dataset):
     
-    def __init__(self, file_path, text_column1, text_column2, max_tokens, word_embedding_type, vocab = None):
+    def __init__(self, file_path, text_column1, text_column2, max_tokens, word_embedding_type, vocab = None, unk_index = None):
         self.data = pd.read_csv(file_path, header = 0)
         self.text_column1 = text_column1
         self.text_column2 = text_column2
         self.max_tokens = max_tokens
         self.word_embedding_type = word_embedding_type
         self.vocab = vocab
+        self.unk_index = unk_index
         if word_embedding_type == 'bert':
-            #self.tokenizer = bert.BertTokenizer.from_pretrained('bert-base-uncased')
-            self.tokenizer = bert.BertTokenizer.from_pretrained('/home/s1834310/Dissertation/PretrainedBert')
+            self.tokenizer = bert.BertTokenizer.from_pretrained('bert-base-uncased')
+            #self.tokenizer = bert.BertTokenizer.from_pretrained('/home/s1834310/Dissertation/PretrainedBert')
             
         
     def __len__(self):
@@ -84,8 +85,8 @@ class RawTextDataset(Dataset):
                 text1 = text1.apply(lambda x: x + ['[PAD]'] * (self.max_tokens - len(x)) if len(x) < self.max_tokens else x[0:self.max_tokens])
                 text2 = text2.apply(lambda x: x + ['[PAD]'] * (self.max_tokens - len(x)) if len(x) < self.max_tokens else x[0:self.max_tokens])
                 
-                text1 = text1.apply(lambda x: embedder.word2index(x, self.vocab))
-                text2 = text2.apply(lambda x: embedder.word2index(x, self.vocab))
+                text1 = text1.apply(lambda x: embedder.word2index(x, self.vocab, self.unk_index))
+                text2 = text2.apply(lambda x: embedder.word2index(x, self.vocab, self.unk_index))
                 
                 text1 = torch.tensor(text1)
                 text2 = torch.tensor(text2)
@@ -146,13 +147,14 @@ class RawTextDataset(Dataset):
                     input_mask2 = bert_df2[:,66:]
 
                 
-                return torch.tensor(indexed_tokens1), torch.tensor(segments1), torch.tensor(input_mask1), torch.tensor(indexed_tokens2), torch.tensor(segments2), torch.tensor(input_mask2), torch.tensor(label)
+                return indexed_tokens1, segments1, input_mask1, indexed_tokens2, segments2, input_mask2, label
+            #torch.tensor(indexed_tokens1), torch.tensor(segments1), torch.tensor(input_mask1), torch.tensor(indexed_tokens2), torch.tensor(segments2), torch.tensor(input_mask2), torch.tensor(label)
 
         
 
     
 def data_loaders_builder(dataset_class, batch_size, word_embedding_type, train_path, val_path, D = None,
-                         text_column1 = None, text_column2 = None, vocab = None, max_tokens = None):
+                         text_column1 = None, text_column2 = None, vocab = None, unk_index = None, max_tokens = None):
     
     if dataset_class == 'SIFDataset':
         
@@ -164,13 +166,13 @@ def data_loaders_builder(dataset_class, batch_size, word_embedding_type, train_p
     
     if dataset_class == 'RawTextDataset':
         
-        train_set = eval(dataset_class + '(train_path, text_column1, text_column2, max_tokens, word_embedding_type, vocab)')#, vocab_size
+        train_set = eval(dataset_class + '(train_path, text_column1, text_column2, max_tokens, word_embedding_type, vocab, unk_index)')#, vocab_size
         #idk if this is going to work with the padding thing we've done because
         #I think this loads it little by little? I can't tell if this only does it when DataLoader tells it to or if it does it all at once
         #and then DataLoader loads it little by little
         train_loader = DataLoader(train_set, batch_size=batch_size, shuffle=True)
         
-        val_set = eval(dataset_class + '(val_path, text_column1, text_column2, max_tokens, word_embedding_type, vocab)')#, vocab_size
+        val_set = eval(dataset_class + '(val_path, text_column1, text_column2, max_tokens, word_embedding_type, vocab, unk_index)')#, vocab_size
         val_loader = DataLoader(val_set, batch_size=batch_size, shuffle=True)
     
     return train_loader, val_loader     
@@ -264,6 +266,7 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
                 input_mask2 = input_mask2.to(dev)
                 labels = labels.to(dev)
                 
+                
                 optimizer.zero_grad()
                 
                 outputs = net(tokens1, segments1, input_mask1, tokens2, segments2, input_mask2)
@@ -314,11 +317,21 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
                             elif net.__class__.__name__ == 'BertLSTMSiameseNet':
 
                                 tokens1, segments1, input_mask1, tokens2, segments2, input_mask2, labels = data
+                                tokens1 = tokens1.long()
+                                segments1 = segments1.long()
+                                input_mask1 = input_mask1.long()
+                                tokens2 = tokens2.long()
+                                segments2 = segments2.long()
+                                input_mask2 = input_mask2.long()
+                                labels = labels.float()
                                 tokens1 = tokens1.to(dev)
                                 segments1 = segments1.to(dev)
+                                input_mask1 = input_mask1.to(dev)
                                 tokens2 = tokens2.to(dev)
                                 segments2 = segments2.to(dev)
-
+                                input_mask2 = input_mask2.to(dev)
+                                labels = labels.to(dev)
+                                
                                 outputs = net(tokens1, segments1, input_mask1, tokens2, segments2, input_mask2)
 
 
@@ -344,14 +357,14 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
     
     if val == True:
         p = plt.plot(np.arange(len(train_loss_over_time)), train_loss_over_time, np.arange(len(val_loss_over_time)), val_loss_over_time)
-        plt.xlabel('batch number')
+        plt.xlabel('epoch number')
         plt.ylabel('loss')
         plt.gca().legend(('train','validation'))
         plt.savefig('TrainValLoss' + train_dataset_name + '.png')
     
     else:
         p = plt.plot(np.arange(len(train_loss_over_time)), train_loss_over_time)
-        plt.xlabel('epoch*batch_size')
+        plt.xlabel('epoch number')
         plt.ylabel('loss')
         plt.gca().legend(('train','validation'))
         plt.savefig('TrainValLoss' + train_dataset_name + '.png')
@@ -404,11 +417,21 @@ def evaluate(val_loader, D, net, dev):
             elif net.__class__.__name__ == 'BertLSTMSiameseNet':
     
                 tokens1, segments1, input_mask1, tokens2, segments2, input_mask2, labels = data
+                tokens1 = tokens1.long()
+                segments1 = segments1.long()
+                input_mask1 = input_mask1.long()
+                tokens2 = tokens2.long()
+                segments2 = segments2.long()
+                input_mask2 = input_mask2.long()
+                labels = labels.float()
                 tokens1 = tokens1.to(dev)
                 segments1 = segments1.to(dev)
+                input_mask1 = input_mask1.to(dev)
                 tokens2 = tokens2.to(dev)
                 segments2 = segments2.to(dev)
-                
+                input_mask2 = input_mask2.to(dev)
+                labels = labels.to(dev)
+
                 outputs = net(tokens1, segments1, input_mask1, tokens2, segments2, input_mask2)
 
             outputs = outputs.cpu()

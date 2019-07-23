@@ -92,13 +92,14 @@ class LSTMSiameseNet(nn.Module):
     out_features = 128?????? <-I'm really unclear about this part from the paper
     bidirectional = True
     dropout = 0.2?
+    
+    ***HOW DOES THE LSTM KNOW WHAT OUR PADDING INDEX IS / HOW TO DEAL WITH PADDING APPROPRIATELY?***
+    https://towardsdatascience.com/taming-lstms-variable-sized-mini-batches-and-why-pytorch-is-good-for-your-health-61d35642972e
     '''
     
     
     def __init__(self, embedding_dim, hidden_size, number_layers, out_features, dropout, bidirectional, embeddings, max_tokens, padding_idx):
         super(LSTMSiameseNet, self).__init__()
-        #self.input_size = input_size
-        #SIZE OF HIDDEN LAYERS???
         self.embedding_dim = embedding_dim
         self.hidden_size = hidden_size
         self.number_layers = number_layers
@@ -108,7 +109,6 @@ class LSTMSiameseNet(nn.Module):
         self.max_tokens = max_tokens
         self.padding_idx = padding_idx
         self.embedding = nn.Embedding.from_pretrained(embeddings, padding_idx = self.padding_idx)
-        #^^NOTE: WE MAY WANT TO EXPAND OUR VOCABULARY BEFORE THIS, DEPENDING ON WHICH MODEL WE'RE USING
         self.embedding.weight.requires_grad = False
         
         self.lstm = nn.LSTM(input_size = self.embedding_dim, hidden_size = self.hidden_size,
@@ -117,30 +117,16 @@ class LSTMSiameseNet(nn.Module):
         self.fc = nn.Linear(in_features = self.hidden_size, out_features = self.out_features)#I'M NOT CLEAR ON HOW THIS ENDS
     
     def forward_once(self, x):
-        #DO THE EMBEDDING STEP
-        x = self.embedding(x)#.long()
-        #https://towardsdatascience.com/taming-lstms-variable-sized-mini-batches-and-why-pytorch-is-good-for-your-health-61d35642972e
-        #***HOW DOES THIS FUNCTION KNOW WHAT THE PADDING INDEX IS THOUGH?
-	#x = rnn.pack_padded_sequence(x, self.max_tokens, batch_first=True)
-        _, x = self.lstm(x) #first item is all hidden states, second is most recent hidden state
-        #I think the paper just uses the last hidden state
-        #x, _ = torch.nn.utils.rnn.pad_packed_sequence(x, batch_first=True)
-        #I can't tell if we're going to be okay without this or not
-        x = torch.cat(x)
-        x = torch.mean(x, dim = 1) #I'M NOT SURE IF I'M DOING THIS RIGHT
-        x = self.fc(x) #WHAT IS THE ACTIVATION FUNCTION HERE? none?
+        x = self.embedding(x)
+        x, (hidden, cell) = self.lstm(x)
+        x = torch.mean(x, dim = 1)
+        x = self.fc(x)
         return x
     
     def forward(self ,x1, x2):
         x1 = self.forward_once(x1)
         x2 = self.forward_once(x2)
-        return F.cosine_similarity(x1, x2)#is this what I'm supposed to return?
-#outcome is cosince similarity IS bounded between [0,1] which is obviously useful for us
-        
-    
-    
-    
-    
+        return F.cosine_similarity(x1, x2)
     
     
     
@@ -160,47 +146,45 @@ class BertLSTMSiameseNet(nn.Module):
     out_features = 128?????? <-I'm really unclear about this part from the paper
     bidirectional = True
     dropout = 0.2?
+    
+    according to the BERT paper: "the best performing method is to concatenate the token representations 
+    from the top four hidden layers of the pre-trained Transformer"
     '''
     
     
-    def __init__(self, embedding_dim, hidden_size, number_layers, out_features, dropout, bidirectional):#, embeddings, max_tokens, padding_idx
-        super(BertLSTMSiameseNet, self).__init__()
+    def __init__(self, embedding_dim, hidden_size, number_layers, out_features, dropout, bidirectional):
         
+        super(BertLSTMSiameseNet, self).__init__()
         self.embedding_dim = embedding_dim
         self.hidden_size = hidden_size
         self.number_layers = number_layers
         self.out_features = out_features
         self.dropout = dropout
         self.bidirectional = bidirectional
-        #self.bert = bert.BertModel.from_pretrained('bert-base-uncased')
-        self.bert = bert.BertModel.from_pretrained('/home/s1834310/Dissertation/PretrainedBert', output_hidden_states=True, output_attentions=True)
+        self.bert = bert.BertModel.from_pretrained('bert-base-uncased',
+                                                   output_hidden_states=True, output_attentions=True)
+        #self.bert = bert.BertModel.from_pretrained('/home/s1834310/Dissertation/PretrainedBert',
+        #                                           output_hidden_states=True, output_attentions=True)
                 
         self.lstm = nn.LSTM(input_size = 4*self.embedding_dim, hidden_size = self.hidden_size,
                             num_layers = self.number_layers, dropout = self.dropout, bidirectional = self.bidirectional)
-        #HOW DO THEY KNOW THE OUTPUT DIMENSION I WANT?
-        self.fc = nn.Linear(in_features = self.hidden_size, out_features = self.out_features)#I'M NOT CLEAR ON HOW THIS ENDS
+        self.fc = nn.Linear(in_features = self.hidden_size*(2*self.bidirectional), out_features = self.out_features)
     
     def forward_once(self, tokens, segments, input_mask):
         self.bert.eval()
         with torch.no_grad():
-            #x, _ = 
-            print(len(self.bert(tokens, segments, input_mask))) 
-        
-        #x = torch.stack(x).squeeze()[8:12,:,:].reshape(1,-1, 4*self.embedding_dim).squeeze() #DOES THIS MAKE SENSE?
-        #according to the BERT paper: "the best performing method is to concatenate the token representations from the top four hidden layers of the pre-trained Transformer"
-        #IN THIS CASE HOW DO I TELL THE LSTM WHAT THE PADDING INDEX IS
-	#LIKE IF THE PADDING INDEX FOR BERT IS ZERO HOW DOES OUR LSTM KNOW THAT?
-        #_, x = self.lstm(x)
-        #x = torch.cat(x)
-        #x = torch.mean(x, dim = 1) #I'M NOT SURE IF I'M DOING THIS RIGHT
-        #x = self.fc(x) #WHAT IS THE ACTIVATION FUNCTION HERE? none?
-        #return x
+            x, _ = self.bert(tokens, segments, input_mask)[-2:]
+        x = torch.stack(x).squeeze()[8:12,:,:,:].reshape(tokens.shape[0],-1,
+                                                         4*self.embedding_dim).squeeze() 
+        x, (hidden, cell) = self.lstm(x)
+        x = torch.mean(x, dim = 1) 
+        x = self.fc(x) #WHAT IS THE ACTIVATION FUNCTION HERE? none?
+        return x
     
     def forward(self, tokens1, segments1, input_mask1, tokens2, segments2, input_mask2):
         x1 = self.forward_once(tokens1, segments1, input_mask1)
         x2 = self.forward_once(tokens2, segments2, input_mask2)
-        return F.cosine_similarity(x1, x2)#is this what I'm supposed to return?
-#outcome is cosince similarity IS bounded between [0,1] which is obviously useful for us
+        return F.cosine_similarity(x1, x2)
         
     
     
@@ -236,6 +220,7 @@ class ElmoLSTMSiameseNet(nn.Module):
         self.out_features = out_features
         self.dropout = dropout
         self.bidirectional = bidirectional
+        #WE'RE NOT GOING TO BE ABLE TO ACCESS THIS ON THE CLUSTER...
         self.options_file ='https://allennlp.s3.amazonaws.com/models/elmo/2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_options.json'
         self.weight_file = 'https://allennlp.s3.amazonaws.com/models/elmo/2x4096_512_2048cnn_2xhighway/elmo_2x4096_512_2048cnn_2xhighway_weights.hdf5'
         self.elmo = elmo.Elmo(self.options_file, self.weight_file, 1, dropout = 0)
@@ -250,8 +235,7 @@ class ElmoLSTMSiameseNet(nn.Module):
     def forward_once(self, x):
         x = self.elmo(x)#IS THIS IT? DOES THIS INCLUDE THE WEIGHTED AVERAGE THING? ARE WE GOING TO BE LEARNING THE WEIGHTED AVERAGE WITHOUT FINE TUNING THE 
                 
-        _, x = self.lstm(x)
-        x = torch.cat(x)
+        x, (hidden, cell) = self.lstm(x)
         x = torch.mean(x, dim = 1) #I'M NOT SURE IF I'M DOING THIS RIGHT
         x = self.fc(x) #WHAT IS THE ACTIVATION FUNCTION HERE? none?
         return x
