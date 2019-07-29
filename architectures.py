@@ -11,6 +11,7 @@ import pandas as pd
 import matplotlib
 matplotlib.use('Agg')
 import matplotlib.pyplot as plt
+import sklearn.metrics
 import nltk.tokenize
 import torch
 #import torch.nn.functional as F
@@ -60,8 +61,8 @@ class RawTextDataset(Dataset):
         self.vocab = vocab
         self.unk_index = unk_index
         if word_embedding_type == 'bert':
-            self.tokenizer = bert.BertTokenizer.from_pretrained('bert-base-uncased')
-            #self.tokenizer = bert.BertTokenizer.from_pretrained('/home/s1834310/Dissertation/PretrainedBert')
+            #self.tokenizer = bert.BertTokenizer.from_pretrained('bert-base-uncased')
+            self.tokenizer = bert.BertTokenizer.from_pretrained('/home/s1834310/Dissertation/PretrainedBert')
             
         
     def __len__(self):
@@ -183,25 +184,35 @@ def data_loaders_builder(dataset_class, batch_size, word_embedding_type, train_p
     
 #https://innovationincubator.com/siamese-neural-network-with-pytorch-code-example/    
 class ContrastiveLoss(nn.Module):
-    
-    def __init__(self, margin=2.0): #definitely just stole that margin = 2 thing from the link above
+   
+    def __init__(self, margin=0.5): #definitely just stole that margin = 2 thing from the link above
             super(ContrastiveLoss, self).__init__()
             self.margin = margin
 
-    def forward(self, cosine_similarity, label):
+    def forward(self, cosine_similarity, labels):
         # Find the pairwise distance or eucledian distance of two output feature vectors
         #cosine_similarity = F.cosine_similarity(output1, output2)
         # perform contrastive loss calculation with the distance
-        loss_contrastive = torch.mean(label * torch.pow(0.25*cosine_similarity, 2) +
-        (1 - label) * torch.pow(torch.clamp(self.margin - cosine_similarity, min=0.0), 2))
+        loss_contrastive = torch.mean(labels * 0.25*torch.pow((1-cosine_similarity), 2) \
+        + (1 - labels) * (torch.pow(cosine_similarity, 2)*(cosine_similarity<self.margin).float() \
+        + 0*(cosine_similarity>=self.margin).float()))
+ 
+        return loss_contrastive
+   
+#https://github.com/stytim/LFW_Siamese_Pytorch/blob/master/Contrastive-Loss.py
+class ContrastiveLoss2(nn.Module):
+    def __init__(self, margin=1.0):
+        super(ContrastiveLoss2, self).__init__()
+        self.margin = margin
 
-        return loss_contrastive    
-
+    def forward(self, euclidean_distance, label):
+        loss_contrastive = torch.mean((label) * torch.pow(euclidean_distance, 2) + (1-label) * torch.pow(torch.clamp(self.margin - euclidean_distance, min=0.0), 2))
+        return loss_contrastive
     
 
 
 #training
-def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D, optimizer, net, criterion, dev, output_filename, train_dataset_name, val = True):
+def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D, optimizer, net, criterion, dev, output_filename, train_dataset_name, embedding_type, val = True):
     
     train_loss_over_time = []
     val_loss_over_time = []
@@ -247,7 +258,7 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
 
                 # forward + backward + optimize
                 outputs = net(inputs1, inputs2) 
-                
+                print(outputs)
             elif net.__class__.__name__ == 'BertLSTMSiameseNet':
                 
                 tokens1, segments1, input_mask1, tokens2, segments2, input_mask2, labels = data
@@ -257,7 +268,7 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
                 tokens2 = tokens2.long()
                 segments2 = segments2.long()
                 input_mask2 = input_mask2.long()
-                labels = labels.float()
+                labels = labels.reshape(-1,1).float()
                 tokens1 = tokens1.to(dev)
                 segments1 = segments1.to(dev)
                 input_mask1 = input_mask1.to(dev)
@@ -323,7 +334,7 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
                                 tokens2 = tokens2.long()
                                 segments2 = segments2.long()
                                 input_mask2 = input_mask2.long()
-                                labels = labels.float()
+                                labels = labels.reshape(-1,1).float()
                                 tokens1 = tokens1.to(dev)
                                 segments1 = segments1.to(dev)
                                 input_mask1 = input_mask1.to(dev)
@@ -360,25 +371,27 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
         plt.xlabel('epoch number')
         plt.ylabel('loss')
         plt.gca().legend(('train','validation'))
-        plt.savefig('TrainValLoss' + train_dataset_name + '.png')
+        plt.savefig(train_dataset_name + '_' + net.__class__.__name__ + '_' + embedding_type + '_Train_Val_Loss' + '.png')
     
     else:
         p = plt.plot(np.arange(len(train_loss_over_time)), train_loss_over_time)
         plt.xlabel('epoch number')
         plt.ylabel('loss')
         plt.gca().legend(('train','validation'))
-        plt.savefig('TrainValLoss' + train_dataset_name + '.png')
+        plt.savefig(train_dataset_name + '_' + net.__class__.__name__ + '_' + embedding_type + '_Train_Val_Loss' + '.png')
 
 
 
 #validation
-def evaluate(val_loader, D, net, dev):    
+def evaluate(val_loader, D, net, dev, train_dataset_name, embedding_type):    
     
     
     #https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html#sphx-glr-beginner-blitz-cifar10-tutorial-py
-
     
     #validation
+    outputs_all = []
+    labels_all = []
+    
     correct = 0
     total = 0
     fp = 0
@@ -423,7 +436,7 @@ def evaluate(val_loader, D, net, dev):
                 tokens2 = tokens2.long()
                 segments2 = segments2.long()
                 input_mask2 = input_mask2.long()
-                labels = labels.float()
+                labels = labels.reshape(-1,1).float()
                 tokens1 = tokens1.to(dev)
                 segments1 = segments1.to(dev)
                 input_mask1 = input_mask1.to(dev)
@@ -433,7 +446,10 @@ def evaluate(val_loader, D, net, dev):
                 labels = labels.to(dev)
 
                 outputs = net(tokens1, segments1, input_mask1, tokens2, segments2, input_mask2)
-
+            
+            outputs_all.append(outputs.cpu())
+            labels_all.append(labels.cpu())
+            
             outputs = outputs.cpu()
             labels = labels.cpu()
             
@@ -462,5 +478,22 @@ def evaluate(val_loader, D, net, dev):
     
     print('F1 score on validation set: %d %%' % (
         100 *  (2*tp) / (2*tp + fp + fn)))
+    
+    
+    labels_all = [item for sublist in labels_all for item in sublist]
+    outputs_all = [item for sublist in outputs_all for item in sublist]
+
+    fpr, tpr, thresholds = sklearn.metrics.roc_curve(labels_all, outputs_all, pos_label = 1)
+    auc = sklearn.metrics.auc(fpr, tpr)
+
+
+    p = plt.plot(fpr, tpr, color = 'darkorange', label='ROC curve (area = %0.2f)' % auc)
+    #plt.plot([0,1],[0,1], color = 'navy', linestyle = '--')
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    #plt.title('Amazon Google Bert Simple Model ROC')
+    plt.legend(loc='lower right')
+    plt.savefig(train_dataset_name + '_' + embedding_type + '_' + net.__class__.__name__ + '_ROC' '.png')
+
     
     net.train()

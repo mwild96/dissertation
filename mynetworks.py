@@ -112,21 +112,21 @@ class LSTMSiameseNet(nn.Module):
         self.embedding.weight.requires_grad = False
         
         self.lstm = nn.LSTM(input_size = self.embedding_dim, hidden_size = self.hidden_size,
-                            num_layers = self.number_layers, dropout = self.dropout, bidirectional = self.bidirectional)
+                            num_layers = self.number_layers, dropout = self.dropout, bidirectional = self.bidirectional, batch_first = True)
         #HOW DO THEY KNOW THE OUTPUT DIMENSION I WANT?
-        self.fc = nn.Linear(in_features = self.hidden_size, out_features = self.out_features)#I'M NOT CLEAR ON HOW THIS ENDS
+        self.fc = nn.Linear(in_features = self.hidden_size*(2*self.bidirectional), out_features = self.out_features)#I'M NOT CLEAR ON HOW THIS ENDS
     
     def forward_once(self, x):
         x = self.embedding(x)
         x, (hidden, cell) = self.lstm(x)
         x = torch.mean(x, dim = 1)
-        x = self.fc(x)
+        x = F.relu(self.fc(x))
         return x
     
     def forward(self ,x1, x2):
         x1 = self.forward_once(x1)
         x2 = self.forward_once(x2)
-        return F.cosine_similarity(x1, x2)
+        return torch.clamp(F.cosine_similarity(x1, x2).reshape(-1,1), min=0.4, max = 0.6)#F.pairwise_distance(x1,x2).reshape(-1,1)
     
     
     
@@ -161,13 +161,13 @@ class BertLSTMSiameseNet(nn.Module):
         self.out_features = out_features
         self.dropout = dropout
         self.bidirectional = bidirectional
-        self.bert = bert.BertModel.from_pretrained('bert-base-uncased',
-                                                   output_hidden_states=True, output_attentions=True)
-        #self.bert = bert.BertModel.from_pretrained('/home/s1834310/Dissertation/PretrainedBert',
+        #self.bert = bert.BertModel.from_pretrained('bert-base-uncased',
         #                                           output_hidden_states=True, output_attentions=True)
+        self.bert = bert.BertModel.from_pretrained('/home/s1834310/Dissertation/PretrainedBert',
+                                                   output_hidden_states=True, output_attentions=True)
                 
         self.lstm = nn.LSTM(input_size = 4*self.embedding_dim, hidden_size = self.hidden_size,
-                            num_layers = self.number_layers, dropout = self.dropout, bidirectional = self.bidirectional)
+                            num_layers = self.number_layers, dropout = self.dropout, bidirectional = self.bidirectional, batch_first = True)
         self.fc = nn.Linear(in_features = self.hidden_size*(2*self.bidirectional), out_features = self.out_features)
     
     def forward_once(self, tokens, segments, input_mask):
@@ -178,13 +178,13 @@ class BertLSTMSiameseNet(nn.Module):
                                                          4*self.embedding_dim).squeeze() 
         x, (hidden, cell) = self.lstm(x)
         x = torch.mean(x, dim = 1) 
-        x = self.fc(x) #WHAT IS THE ACTIVATION FUNCTION HERE? none?
+        x = F.relu(self.fc(x)) #WHAT IS THE ACTIVATION FUNCTION HERE? none?
         return x
     
     def forward(self, tokens1, segments1, input_mask1, tokens2, segments2, input_mask2):
         x1 = self.forward_once(tokens1, segments1, input_mask1)
         x2 = self.forward_once(tokens2, segments2, input_mask2)
-        return F.cosine_similarity(x1, x2)
+        return F.cosine_similarity(x1, x2).reshape(-1,1)#F.pairwise_distance(x1,x2).reshape(-1,1)#
         
     
     

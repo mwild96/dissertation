@@ -11,7 +11,7 @@ import numpy as np
 import gensim.downloader as api
 import gensim.models
 import torch 
-#import torch.nn as nn
+import torch.nn as nn
 import torch.optim as optim
 import arg_extractor
 import embedder
@@ -102,7 +102,9 @@ print('NETWORK INSTANCE CREATED')
 
 #I THINK THESE TWO WILL ALWAYS BE THE SAME
 #loss 
-criterion = architectures.ContrastiveLoss()
+#criterion = architectures.ContrastiveLoss()
+#criterion = architectures.ContrastiveLoss2()
+criterion = nn.BCELoss()
 criterion = criterion.to(device)
 
 #optimizer
@@ -116,7 +118,7 @@ print('TRAINING FOR: ', args.train_dataset_name, ', ',
       sep = '')
 
 
-architectures.train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D, optimizer, net, criterion, device, output_file, args.train_dataset_name, val = True)
+architectures.train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D, optimizer, net, criterion, device, output_file, args.train_dataset_name, embedding_type, val = True)
 
 
 print('VALIDATION FOR: ', args.train_dataset_name, ', ', 
@@ -124,7 +126,7 @@ print('VALIDATION FOR: ', args.train_dataset_name, ', ',
       str(network), ', ',
       sep = '')
 
-architectures.evaluate(val_loader, D, net, device)
+architectures.evaluate(val_loader, D, net, device, args.train_dataset_name, embedding_type)
 
 
 #does this division of things make sense?
