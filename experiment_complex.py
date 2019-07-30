@@ -53,21 +53,31 @@ vocab_path = args.data_path + embedding_type
 #vocab.save('word2vec')
 
 #prepare word embeddings
-if embedding_type == 'word2vec' or embedding_type == 'fasttext':
+if embedding_type == 'word2vec' or embedding_type == 'fasttext' or embedding_type == 'random':
     
     #import the data so we can use it to expand the vocabulary 
     train = pd.read_csv(train_path, header = 0, encoding = encoding)
-    val = pd.read_csv(val_path, header = 0, encoding = encoding)
+    #val = pd.read_csv(val_path, header = 0, encoding = encoding)
     
     if embedding_type == 'word2vec':
         #vocab = api.load('word2vec-google-news-300')
         vocab = gensim.models.KeyedVectors.load(vocab_path, mmap = 'r')
-    else:
+        
+    elif embedding_type == 'fasttext':
         #vocab = api.load('fasttext-wiki-news-subwords-300')
         vocab = gensim.models.KeyedVectors.load(vocab_path, mmap = 'r')
-    
-    #embedder.expand_vocabulary(vocab, train, text_column1, text_column2, embedding_dim)
-    #add padding index
+        
+    elif embedding_type == 'random':
+        vocab = embedder.build_vocabulary(train, text_column1, text_column2, embedding_dim, args.seed)
+
+        m = gensim.models.keyedvectors.Word2VecKeyedVectors(vector_size=embedding_dim)
+        m.vocab = vocab
+        m.vectors = np.array(list(vocab.values()))
+        
+        embedder.my_save_word2vec_format(binary=True, fname='random.bin', total_vec=len(vocab), vocab=m.vocab, vectors=m.vectors)
+        vocab = gensim.models.keyedvectors.Word2VecKeyedVectors.load_word2vec_format('random.bin', binary=True)
+        
+        
     vocab.add('[PAD]', np.zeros(embedding_dim,))
     vocab.add('[UNK]', np.random.randn(embedding_dim,))
     unk_index = vocab.vocab.get('[UNK]').index
