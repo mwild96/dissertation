@@ -126,7 +126,7 @@ class LSTMSiameseNet(nn.Module):
     def forward(self ,x1, x2):
         x1 = self.forward_once(x1)
         x2 = self.forward_once(x2)
-        return torch.clamp(F.cosine_similarity(x1, x2).reshape(-1,1), min=0.4, max = 0.6)#F.pairwise_distance(x1,x2).reshape(-1,1)
+        return torch.clamp(F.cosine_similarity(x1, x2).reshape(-1,1), min=0.4, max = 0.6)#F.sigmoid(F.pairwise_distance(x1,x2).reshape(-1,1))
     
     
     
@@ -184,7 +184,7 @@ class BertLSTMSiameseNet(nn.Module):
     def forward(self, tokens1, segments1, input_mask1, tokens2, segments2, input_mask2):
         x1 = self.forward_once(tokens1, segments1, input_mask1)
         x2 = self.forward_once(tokens2, segments2, input_mask2)
-        return F.cosine_similarity(x1, x2).reshape(-1,1)#F.pairwise_distance(x1,x2).reshape(-1,1)#
+        return F.cosine_similarity(x1, x2).reshape(-1,1)#F.sigmoid(F.pairwise_distance(x1,x2).reshape(-1,1))#
         
     
     
