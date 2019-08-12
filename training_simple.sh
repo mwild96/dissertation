@@ -32,18 +32,9 @@ export TMP=/disk/scratch/${STUDENT_ID}/
 
 mkdir -p ${TMP}/datasets/
 export DATASET_DIR=${TMP}/datasets/
+
 # Activate the relevant virtual environment:
-
-
 source /home/${STUDENT_ID}/miniconda3/bin/activate dissertation
 
-#this is what Marko has
-# data_path = "/afs/inf.ed.ac.uk/user/s18/s1834310/Documents/Dissertation/Data/QuoraDuplicateQuestions"
-# target_path = "/afs/inf.ed.ac.uk/user/s18/s1834310/Documents/Dissertation/Models"#is this where things will get output??
-# mkdir -p ${target_dir}
-# rsync -ua --progress data_dir target_dir
-#but I may just not worry about this for now
-
-#python3 or just python?
-python experiment_simple.py --epochs 15 --batch_size 16 --D 300 --train_size 82414 --val_size 13933 --data_path "/home/s1834310/Dissertation/Data/AmazonGoogle/" --output_filename "/home/s1834310/Dissertation/Models/amaz_goog_fasttext_SIF" --use_gpu 'True' --gpu_id '0' --train_dataset_name "amaz_goog_train_fasttext_SIF" --val_dataset_name "amaz_goog_val_fasttext_SIF" --seed 100 --dataset_class 'SIFDataset' --network 'HighwayReluNet' --embedding_type 'fasttext' --weight_decay_coefficient 0.1 #--max_tokens 25 
-#https://machinelearningmastery.com/how-to-reduce-overfitting-in-deep-learning-with-weight-regularization/
+#run the file with arguments
+python experiment_simple.py --epochs 15 --batch_size 16 --D 300 --train_size 82414 --val_size 13933 --data_path "/home/s1834310/Dissertation/Data/AmazonGoogle/" --output_filename "/home/s1834310/Dissertation/Models/amaz_goog_fasttext_SIF" --use_gpu 'True' --gpu_id '0' --train_dataset_name "amaz_goog_train_fasttext_SIF" --val_dataset_name "amaz_goog_val_fasttext_SIF" --seed 100 --dataset_class 'SIFDataset' --network 'HighwayReluNet' --embedding_type 'fasttext' --weight_decay_coefficient 0.1 
