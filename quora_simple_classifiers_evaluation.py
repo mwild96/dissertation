@@ -179,7 +179,6 @@ plt.show()
 
 
 
-wn.synsets('unusual')
 
 #MEANING CONFLATION DEFICIENCY#
 #https://stackoverflow.com/questions/22016273/list-of-polysemy-words
