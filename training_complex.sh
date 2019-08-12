@@ -1,4 +1,5 @@
-
+#adapted from the repository for the University of Edinburgh School of Informatics Machine Learning Practical course:
+#https://github.com/CSTR-Edinburgh/mlpractical
 
 #!/bin/sh
 #SBATCH -N 1	  # nodes requested
@@ -40,4 +41,4 @@ export DATASET_DIR=${TMP}/datasets/
 source /home/${STUDENT_ID}/miniconda3/bin/activate dissertation
 
 #run the file with arguments
-python experiment_complex.py --epochs 15 --batch_size 16 --train_size 242610 --val_size 80870 --embedding_dim 300 --data_path "/home/s1834310/Dissertation/Data/QuoraDuplicateQuestions/" --output_filename "/home/s1834310/Dissertation/Models/quora_word2vec_lstm_siam" --use_gpu 'True' --gpu_id '0' --train_dataset_name "quora_train" --val_dataset_name "quora_val" --seed 100 --dataset_class 'RawTextDataset' --network 'LSTMSiameseNet' --embedding_type 'word2vec' --max_tokens 31 --text_column1 'question1' --text_column2 'question2' --encoding 'utf-8' --hidden_size 64 --num_layers 4 --out_features 128 --dropout 0.2 --bidirectional True
+python experiment_complex.py --epochs 15 --batch_size 16 --train_size 242610 --val_size 80870 --embedding_dim 300 --data_path "/home/s1834310/Dissertation/Data/QuoraDuplicateQuestions/" --output_filename "/home/s1834310/Dissertation/Models/quora_word2vec_lstm_siam" --use_gpu 'True' --gpu_id '0' --train_dataset_name "quora_train" --val_dataset_name "quora_val" --seed 100 --dataset_class 'RawTextDataset' --network 'LSTMSiameseNet' --embedding_type 'word2vec' --max_tokens 31 --text_column1 'question1' --text_column2 'question2' --encoding 'utf-8' --hidden_size 64 --num_layers 4 --out_features 128 --dropout 0.2 --bidirectional True --weight_decay_coefficient 0
