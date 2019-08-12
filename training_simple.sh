@@ -1,3 +1,6 @@
+#adapted from the repository for the University of Edinburgh School of Informatics Machine Learning Practical course:
+#https://github.com/CSTR-Edinburgh/mlpractical/tree/mlp2018-9/mlp_cluster_tutorial
+
 #!/bin/sh
 #SBATCH -N 1	  # nodes requested
 #SBATCH -n 1	  # tasks requested
