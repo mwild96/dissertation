@@ -140,6 +140,8 @@ bert_cfp_indices = bert_val.loc[np.logical_and(bert_val[768] != bert_val['predic
 
 
 #PERCENTAGE OOV#
+#does the contextualized embeddings' better handling of the out-of-vocabulary problem result in better performance 
+#against the non-contextualized embeddings? 
 
 def percentage_oov(string, vocab):
     lst = nltk.tokenize.word_tokenize(re.sub('n\'t', ' not', str(string)))
@@ -181,6 +183,9 @@ plt.show()
 
 
 #MEANING CONFLATION DEFICIENCY#
+#does the contextualized embeddings' better handling of the polysemous words, for which they were originally designed,
+#result in better performance against the non-contextualized embeddings? 
+
 #https://stackoverflow.com/questions/22016273/list-of-polysemy-words
 def polysemous_count(lst):
     count = 0
