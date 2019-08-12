@@ -472,7 +472,8 @@ def train(epochs, batch_size, train_loader, val_loader, train_size, val_size, D,
 #https://pytorch.org/tutorials/beginner/blitz/cifar10_tutorial.html#sphx-glr-beginner-blitz-cifar10-tutorial-py
 def evaluate(val_loader, D, net, dev, train_dataset_name, embedding_type):   
     '''
-    This function performs the validation for a network on a given validation set. It is designed for use with GPUs.
+    This function performs the validation for a network on a given validation set. It prints out the relevant statistics on
+    the validation set - accuracy, precision, recall, and F1 score. It is designed for use with GPUs.
     
     Inputs:
     val_loader: a torch Dataloader object, a torch DataLoader object, dataloader that loads validation pairs
@@ -481,6 +482,9 @@ def evaluate(val_loader, D, net, dev, train_dataset_name, embedding_type):
     dev: an int/string, the name of the GPU to be used
     train_dataset_name: a string, the name of the dataset used to trian the network,
     embedding_type: a string, the name of the word embeddings used
+    
+    Outputs:
+    p: a plot of the ROC curve based on the predictions of the network on the validation set
     '''
 
     outputs_all = []
