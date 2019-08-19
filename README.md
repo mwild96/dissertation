@@ -6,25 +6,25 @@ The word in this project was inspired by the success of the contextualized word 
 
 This repository contains the following files:
 
-### mynetworks.py
+#### mynetworks.py
 This file contains the Pytorch implementation of the two different classifier structures used.
 
-### architectures.py
+#### architectures.py
 This file contains necessary functions and classes for training, including Pytorch Dataset classes for each type of classifier, alternative loss functions, and training and validation loops.
 
-### embedder.py
+#### embedder.py
 This file contains helper functions for converting raw text into the inputs required of the two different classifiers.
 
-### blocking.py
+#### blocking.py
 This file contains some very basic helping functions for tackling class imbalance problems (in this project, used only on the Amazon-Google dataset).
 
-### quora_SIF_data_prep.py
+#### quora_SIF_data_prep.py
 This file is an example for how to produce the input representation for the two layer MLP with Highway.
 
-### quora_SIF_evaluation.py
+#### quora_SIF_evaluation.py
 This file contains some sample analysis that was conducted on the results of the two layer MLP with Highway classifiers.
 
-### experiment_simple.py, experiment_complex.py, training_simple.sh, training_complex.sh, arg_extractor.py
+#### experiment_simple.py, experiment_complex.py, training_simple.sh, training_complex.sh, arg_extractor.py
 These files were used simply to train models on the cluster of GPUs that was used in this project.
 
 
