@@ -10,6 +10,7 @@ import pandas as pd
 import sklearn.model_selection
 import gensim.downloader as api
 import pytorch_transformers as bert
+import allennlp.commands.elmo as elmo
 import embedder
 
 
@@ -139,6 +140,35 @@ quora_val_bert_SIF = np.concatenate((quora_val_bert_SIF, quora_labels_val.values
 #export
 pd.DataFrame(quora_val_bert_SIF).to_csv('Data/QuoraDuplicateQuestions/quora_val_bert_SIF.csv', header = False, index = False)
 
+
+
+
+
+
+
+
+##ELMO SIF##
+elmo_model = elmo.ElmoEmbedder()
+question1_weight_dict = embedder.SIF_weights(quora_train, 'question1') 
+question2_weight_dict = embedder.SIF_weights(quora_train, 'question2')
+
+
+
+#train#
+quora_train_elmo_SIF = embedder.weighted_average_embedding_array('elmo', quora_train, 'question1', 'question2', question1_weight_dict, question2_weight_dict, tokenizer = None, vocabulary = None, model = elmo_model)
+#add labels
+quora_train_elmo_SIF = np.concatenate((quora_train_elmo_SIF, quora_labels_train.values.reshape(-1,1)), axis=1)
+#export
+pd.DataFrame(quora_train_elmo_SIF).to_csv('Data/QuoraDuplicateQuestions/quora_train_elmo_SIF.csv', header = False, index = False)
+
+
+
+#val#
+quora_val_elmo_SIF = embedder.weighted_average_embedding_array('elmo', quora_val, 'question1', 'question2', question1_weight_dict, question2_weight_dict, tokenizer = None, vocabulary = None, model = elmo_model)
+#add labels
+quora_val_elmo_SIF = np.concatenate((quora_val_elmo_SIF, quora_labels_val.values.reshape(-1,1)), axis=1)
+#export
+pd.DataFrame(quora_val_elmo_SIF).to_csv('Data/QuoraDuplicateQuestions/quora_val_elmo_SIF.csv', header = False, index = False)
 
 
 
