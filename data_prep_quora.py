@@ -9,8 +9,8 @@ import numpy as np
 import pandas as pd
 import sklearn.model_selection
 import gensim.downloader as api
+import pytorch_transformers as bert
 import embedder
-#80870
 
 
 ##GENERAL DATA SET-UP##
@@ -55,11 +55,6 @@ quora_val_random_SIF = embedder.weighted_average_embedding_array('random', quora
 quora_val_random_SIF = np.concatenate((quora_val_random_SIF, quora_labels_val.values.reshape(-1,1)), axis = 1)
 pd.DataFrame(quora_val_random_SIF).to_csv('Data\QuoraDuplicateQuestions\quora_val_random_SIF.csv', index = False)
 
-#test#
-quora_test_random_SIF = embedder.weighted_average_embedding_array('random', quora_test, 'question1', 'question2', question1_weight_dict, question2_weight_dict, vocabulary = vocab)
-quora_test_random_SIF = np.concatenate((quora_test_random_SIF, quora_labels_test.values.reshape(-1,1)), axis = 1)
-pd.DataFrame(quora_test_random_SIF).to_csv('Data\QuoraDuplicateQuestions\quora_test_random_SIF.csv', index = False)
-
 
 
 
@@ -76,16 +71,15 @@ question2_weight_dict = embedder.SIF_weights(quora_train, 'question2')
 #now apply to all data
 #train#
 quora_train_word2vec_SIF = embedder.weighted_average_embedding_array('word2vec', quora_train, 'question1', 'question2', question1_weight_dict, question2_weight_dict, vocabulary = vocab)
+#add labels
+quora_train_word2vec_SIF = np.concatenate((quora_train_word2vec_SIF, quora_labels_train.values.reshape(-1,1)), axis=1)
 quora_train_word2vec_SIF.to_csv('Data\QuoraDuplicateQuestions\quora_train_word2vec_SIF.csv', index = False)
 
 #val#
 quora_val_word2vec_SIF = embedder.weighted_average_embedding_array('word2vec', quora_val, 'question1', 'question2', question1_weight_dict, question2_weight_dict, vocabulary = vocab)
+#add labels
+quora_val_word2vec_SIF = np.concatenate((quora_val_word2vec_SIF, quora_labels_val.values.reshape(-1,1)), axis=1)
 pd.DataFrame(quora_val_word2vec_SIF).to_csv('Data\QuoraDuplicateQuestions\quora_val_word2vec_SIF.csv', index = False)
-
-#test#
-quora_test_word2vec_SIF = embedder.weighted_average_embedding_array('word2vec', vocab, quora_test, 'question1', 'question2', question1_weight_dict, question1_weight_dict, 31, 300)
-quora_test_word2vec_SIF.to_csv('Data\QuoraDuplicateQuestions\quora_test_word2vec_SIF.csv', index = False)
-
 
 
 
@@ -105,18 +99,45 @@ question2_weight_dict = embedder.SIF_weights(quora_train, 'question2')
 
 #train#
 quora_train_fasttext_SIF = embedder.weighted_average_embedding_array('fasttext', quora_train., 'question1', 'question2', question1_weight_dict, question2_weight_dict, vocabulary = vocab)
+#add labels
+quora_train_fasttext_SIF = np.concatenate((quora_train_fasttext_SIF, quora_labels_train.values.reshape(-1,1)), axis=1)
 pd.DataFrame(quora_train_fasttext_SIF).to_csv('Data\QuoraDuplicateQuestions\quora_train_fasttext_SIF.csv', index = False)
 
 
 #val#
 quora_val_fasttext_SIF = embedder.weighted_average_embedding_array('fasttext', quora_val, 'question1', 'question2', question1_weight_dict, question2_weight_dict, vocabulary = vocab)
+#add labels
+quora_val_fasttext_SIF = np.concatenate((quora_val_fasttext_SIF, quora_labels_val.values.reshape(-1,1)), axis=1)
 pd.DataFrame(quora_val_fasttext_SIF).to_csv('Data\QuoraDuplicateQuestions\quora_val_fasttext_SIF.csv', index = False)
 
-#test#
-quora_test_word2vec_SIF = embedder.weighted_average_embedding_array('word2vec', vocab, quora_test, 'question1', 'question2', question1_weight_dict, question1_weight_dict, 31, 300)
-quora_test_word2vec_SIF.to_csv('Data\QuoraDuplicateQuestions\quora_test_word2vec_SIF.csv', index = False)
 
 
+
+
+
+##BERT SIF##
+bert_tokenizer = bert.BertTokenizer.from_pretrained('bert-base-uncased')
+bert_model = bert.BertModel.from_pretrained('bert-base-uncased', output_hidden_states=True, output_attentions=True)    
+question1_weight_dict = embedder.SIF_weights(quora_train, 'question1')
+question2_weight_dict = embedder.SIF_weights(quora_train, 'question2') 
+
+
+
+#train#
+quora_train_bert_SIF = embedder.weighted_average_embedding_array('bert', quora_train, 'question1', 'question2', question1_weight_dict, question2_weight_dict, tokenizer = bert_tokenizer, vocabulary = None, model = bert_model)
+#add labels
+quora_train_bert_SIF = np.concatenate((quora_train_bert_SIF, quora_labels_train.values.reshape(-1,1)), axis=1)
+#export
+pd.DataFrame(quora_train_bert_SIF).to_csv('Data/QuoraDuplicateQuestions/quora_train_bert_SIF.csv', header = False, index = False)
+
+
+
+#val#
+quora_val_bert_SIF = embedder.weighted_average_embedding_array('bert', quora_val, 'question1', 'question2', question1_weight_dict, question2_weight_dict, tokenizer = bert_tokenizer, vocabulary = None, model = bert_model)
+#add labels
+quora_val_bert_SIF = np.concatenate((quora_val_bert_SIF, quora_labels_val.values.reshape(-1,1)), axis=1)
+#export
+pd.DataFrame(quora_val_bert_SIF).to_csv('Data/QuoraDuplicateQuestions/quora_val_bert_SIF.csv', header = False, index = False)
 
 
 
